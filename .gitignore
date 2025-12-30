@@ -1,0 +1,130 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+notebooks/*.ipynb
+
+# =====================
+# Node.js / Next.js
+# =====================
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel
+web/*.tsbuildinfo
+web/next-env.d.ts
+
+# =====================
+# IDE / Editor
+# =====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# =====================
+# OS generated
+# =====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =====================
+# Project specific
+# =====================
+
+# Model files (large binary files - keep only best.pt)
+models/last.pt
+models/checkpoint*.pt
+models/*.pth
+
+# TensorBoard logs (can be regenerated)
+runs/
+
+# Temporary files
+temp.md
+*.tmp
+*.temp
+*.log
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Data files (dataset is 3.8GB - too large for git)
+data/
+
+# Preprocessed/cached data
+*.npy
+*.npz
+*.pkl
+*.pickle
+data/*.csv

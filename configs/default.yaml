@@ -1,0 +1,70 @@
+# Default training configuration for MSL model
+
+# Data settings
+data:
+  train_dir: "data/train"
+  val_dir: "data/val"
+  test_dir: "data/test"
+  num_frames: 30
+  num_workers: 4
+  cache_landmarks: true
+
+# Model settings
+model:
+  type: "lstm"  # Options: 'lstm', 'bilstm', 'bilstm_attention', 'lstm_pooling'
+  input_size: 258
+  num_classes: 90
+  hidden_size: 256
+  num_layers: 3
+  dropout: 0.3
+  bidirectional: false
+
+# Training settings
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  
+  # Scheduler
+  scheduler_type: "plateau"  # Options: 'plateau', 'cosine', 'step', 'none'
+  scheduler_patience: 5
+  scheduler_factor: 0.5
+  min_lr: 0.000001
+  
+  # Early stopping
+  early_stopping: true
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.0001
+  
+  # Gradient clipping
+  gradient_clip: 1.0
+  
+  # Loss function
+  loss_type: "cross_entropy"  # Options: 'cross_entropy', 'focal', 'label_smoothing'
+  label_smoothing: 0.1
+  focal_gamma: 2.0
+  use_class_weights: false
+
+# Augmentation settings
+augmentation:
+  enabled: true
+  temporal_jitter: true
+  temporal_crop: true
+  spatial_noise: true
+  spatial_scale: true
+  random_flip: true
+  drop_frames: true
+
+# Output settings
+output:
+  checkpoint_dir: "models"
+  log_dir: "runs"
+  save_best_only: false
+  log_interval: 10
+
+# Device settings
+device: "auto"  # Options: 'auto', 'mps', 'cuda', 'cpu'
+
+# Random seed for reproducibility
+seed: 42
