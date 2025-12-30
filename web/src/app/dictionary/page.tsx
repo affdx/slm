@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getGlosses, GlossInfo, formatGlossName } from "@/lib/api";
+import { getGlosses, formatGlossName } from "@/lib/api";
 
 export default function DictionaryPage() {
-  const [glosses, setGlosses] = useState<GlossInfo[]>([]);
+  const [glosses, setGlosses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,9 +52,9 @@ export default function DictionaryPage() {
 
     // Find uncategorized glosses
     const categorized = new Set(Object.values(cats).flat());
-    glosses.forEach((g) => {
-      if (!categorized.has(g.gloss)) {
-        cats.other.push(g.gloss);
+    glosses.forEach((gloss) => {
+      if (!categorized.has(gloss)) {
+        cats.other.push(gloss);
       }
     });
 
@@ -68,16 +68,16 @@ export default function DictionaryPage() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
-        (g) =>
-          g.gloss.toLowerCase().includes(term) ||
-          formatGlossName(g.gloss).toLowerCase().includes(term)
+        (gloss) =>
+          gloss.toLowerCase().includes(term) ||
+          formatGlossName(gloss).toLowerCase().includes(term)
       );
     }
 
     // Filter by category
     if (selectedCategory !== "all") {
       const categoryGlosses = categories[selectedCategory] || [];
-      filtered = filtered.filter((g) => categoryGlosses.includes(g.gloss));
+      filtered = filtered.filter((gloss) => categoryGlosses.includes(gloss));
     }
 
     return filtered;
@@ -196,16 +196,16 @@ export default function DictionaryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredGlosses.map((gloss) => (
+            {filteredGlosses.map((gloss, index) => (
               <div
-                key={gloss.gloss}
+                key={gloss}
                 className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-primary-500 hover:shadow-md transition-all cursor-default"
               >
                 <p className="font-medium text-gray-900 dark:text-white text-center">
-                  {formatGlossName(gloss.gloss)}
+                  {formatGlossName(gloss)}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
-                  Index: {gloss.index}
+                  #{index + 1}
                 </p>
               </div>
             ))}
