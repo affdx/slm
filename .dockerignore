@@ -38,8 +38,8 @@ docs/
 *.md
 !README.md
 
-# Data (don't include raw data in image)
-data/
+# Data (don't include raw dataset in image, but keep src/data/)
+/data
 
 # Web frontend (separate Dockerfile)
 web/
