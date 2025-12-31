@@ -178,12 +178,17 @@ function extractFrameLandmarks(
 
   // Extract hand landmarks
   // 
-  // MediaPipe HandLandmarker handedness convention:
-  // The label indicates which hand it is from the PERSON's perspective
-  // (i.e., "Left" = person's left hand, "Right" = person's right hand)
+  // IMPORTANT: MediaPipe HandLandmarker returns handedness from the CAMERA's perspective,
+  // which is MIRRORED from the person's perspective:
+  // - "Left" label from HandLandmarker = person's RIGHT hand
+  // - "Right" label from HandLandmarker = person's LEFT hand
   // 
-  // This matches MediaPipe Holistic used in Python training, so we use
-  // the labels directly without swapping.
+  // MediaPipe Holistic (used in baseline training) returns from the PERSON's perspective
+  // where left_hand_landmarks = person's left hand.
+  // 
+  // To match the baseline training data, we MUST SWAP the hand assignments:
+  // - HandLandmarker "Left" -> assign to RIGHT hand slot (person's right)
+  // - HandLandmarker "Right" -> assign to LEFT hand slot (person's left)
   
   let leftHandIdx = -1;
   let rightHandIdx = -1;
@@ -193,10 +198,11 @@ function extractFrameLandmarks(
       const handedness = handResult.handedness[i];
       if (handedness && handedness.length > 0) {
         const label = handedness[0].categoryName;
+        // SWAP: HandLandmarker labels are from camera perspective (mirrored)
         if (label === "Left") {
-          leftHandIdx = i;
+          rightHandIdx = i;  // Camera's "Left" = Person's RIGHT hand
         } else if (label === "Right") {
-          rightHandIdx = i;
+          leftHandIdx = i;   // Camera's "Right" = Person's LEFT hand
         }
       }
     }
@@ -555,6 +561,8 @@ export async function extractLandmarksWithDrawingData(
   }
 
   // Hand landmarks - determine left/right based on handedness
+  // SWAP labels: HandLandmarker returns from camera perspective (mirrored)
+  // For drawing, we keep the visual position but swap the semantic label
   if (handResult.landmarks && handResult.handedness) {
     for (let i = 0; i < handResult.landmarks.length; i++) {
       const handedness = handResult.handedness[i];
@@ -566,10 +574,11 @@ export async function extractLandmarksWithDrawingData(
           z: lm.z,
         }));
 
+        // SWAP: Camera's "Left" = Person's RIGHT, Camera's "Right" = Person's LEFT
         if (label === "Left") {
-          drawingData.leftHand = landmarks;
+          drawingData.rightHand = landmarks;  // Person's right hand
         } else if (label === "Right") {
-          drawingData.rightHand = landmarks;
+          drawingData.leftHand = landmarks;   // Person's left hand
         }
       }
     }
