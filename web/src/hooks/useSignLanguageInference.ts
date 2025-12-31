@@ -13,6 +13,11 @@ import {
   preloadModel,
   isModelLoaded,
   getGlosses,
+  getCurrentModelType,
+  setModelType,
+  getAvailableModels,
+  type ModelType,
+  type ModelConfig,
 } from "@/lib/inference";
 import {
   extractLandmarksFromBlob,
@@ -41,11 +46,14 @@ export interface UseSignLanguageInferenceReturn {
   loadingProgress: string;
   error: string | null;
   delegate: "GPU" | "CPU";
+  currentModel: ModelType;
+  availableModels: Array<{ type: ModelType; config: ModelConfig }>;
 
   // Actions
   predict: (videoBlob: Blob) => Promise<PredictionResult>;
   initialize: () => Promise<void>;
   switchDelegate: (delegate: "GPU" | "CPU") => Promise<void>;
+  switchModel: (modelType: ModelType) => Promise<void>;
 
   // Utilities
   getGlossList: () => Promise<string[]>;
@@ -60,7 +68,10 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
   const [loadingProgress, setLoadingProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [delegate, setDelegateState] = useState<"GPU" | "CPU">("GPU");
+  const [currentModel, setCurrentModel] = useState<ModelType>(getCurrentModelType());
   const initializingRef = useRef(false);
+  
+  const availableModels = getAvailableModels();
 
   /**
    * Initialize models (ONNX + MediaPipe)
@@ -166,6 +177,31 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
     }
   }, [delegate]);
 
+  /**
+   * Switch between models
+   */
+  const switchModel = useCallback(async (modelType: ModelType) => {
+    if (modelType === currentModel) return;
+    
+    setIsLoading(true);
+    const modelConfig = availableModels.find(m => m.type === modelType)?.config;
+    setLoadingProgress(`Loading ${modelConfig?.name || modelType}...`);
+    setError(null);
+
+    try {
+      await setModelType(modelType);
+      setCurrentModel(modelType);
+      setLoadingProgress("");
+      console.log(`[Hook] Switched to ${modelType} model`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to switch model";
+      setError(message);
+      console.error("[Hook] Failed to switch model:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentModel, availableModels]);
+
   // Auto-initialize on mount (optional - can be disabled for lazy loading)
   useEffect(() => {
     // Check if already loaded
@@ -184,9 +220,12 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
     loadingProgress,
     error,
     delegate,
+    currentModel,
+    availableModels,
     predict,
     initialize,
     switchDelegate,
+    switchModel,
     getGlossList,
   };
 }

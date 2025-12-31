@@ -104,6 +104,7 @@ Thumbs.db
 models/last.pt
 models/checkpoint*.pt
 models/*.pth
+models/training_history.json
 
 # TensorBoard logs (can be regenerated)
 runs/
@@ -129,3 +130,8 @@ data/
 *.pkl
 *.pickle
 data/*.csv
+
+# Experimental/reference folders (contain large data files)
+baseline/
+webcam-optimized/
+NPY/
