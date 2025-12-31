@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getGlosses, formatGlossName } from "@/lib/api";
+import { getGlosses } from "@/lib/inference";
+import { formatGlossName } from "@/hooks/useSignLanguageInference";
 
 export default function DictionaryPage() {
   const [glosses, setGlosses] = useState<string[]>([]);
@@ -16,7 +17,7 @@ export default function DictionaryPage() {
         const data = await getGlosses();
         setGlosses(data);
       } catch (err) {
-        setError("Failed to load glosses. Make sure the API server is running.");
+        setError("Failed to load glosses from local data.");
       } finally {
         setLoading(false);
       }

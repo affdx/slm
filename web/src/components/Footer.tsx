@@ -4,7 +4,7 @@ export function Footer() {
   return (
     <footer className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center space-x-2 mb-4">
@@ -44,33 +44,6 @@ export function Footer() {
                 >
                   About the Project
                 </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Resources</h3>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="https://www.mymfd.org.my/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm"
-                >
-                  Malaysian Federation of the Deaf
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm"
-                >
-                  GitHub Repository
-                </a>
               </li>
             </ul>
           </div>

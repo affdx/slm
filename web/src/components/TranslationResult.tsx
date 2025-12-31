@@ -1,9 +1,20 @@
 "use client";
 
-import { PredictionResult, formatConfidence, formatGlossName } from "@/lib/api";
+import { PredictionResult } from "@/hooks/useSignLanguageInference";
 
 interface TranslationResultProps {
   result: PredictionResult;
+}
+
+function formatConfidence(confidence: number): string {
+  return `${(confidence * 100).toFixed(1)}%`;
+}
+
+function formatGlossName(gloss: string): string {
+  return gloss
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 export function TranslationResult({ result }: TranslationResultProps) {
@@ -88,11 +99,26 @@ export function TranslationResult({ result }: TranslationResultProps) {
         </div>
       </div>
 
-      {/* Processing Time */}
-      <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50 text-center">
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          Processed in {result.processing_time_ms.toFixed(0)}ms
-        </span>
+      {/* Processing Time Breakdown */}
+      <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+          <span>
+            Total: <strong>{result.processing_time_ms.toFixed(0)}ms</strong>
+          </span>
+          {result.landmark_extraction_time_ms !== undefined && (
+            <span>
+              Landmarks: <strong>{result.landmark_extraction_time_ms.toFixed(0)}ms</strong>
+            </span>
+          )}
+          {result.inference_time_ms !== undefined && (
+            <span>
+              Inference: <strong>{result.inference_time_ms.toFixed(0)}ms</strong>
+            </span>
+          )}
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            Client-side
+          </span>
+        </div>
       </div>
     </div>
   );

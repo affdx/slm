@@ -1,44 +1,106 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { formatGlossName, formatConfidence } from "@/lib/api";
-
-interface HistoryItem {
-  id: number;
-  timestamp: string;
-  source: string;
-  prediction: string;
-  confidence: number;
-  top5: Array<{ gloss: string; confidence: number }>;
-}
+import { useState, useEffect, useCallback } from "react";
+import {
+  HistoryItem,
+  getHistoryMetadata,
+  deleteHistoryItem,
+  clearAllHistory,
+  getVideoUrl,
+} from "@/lib/history";
+import { formatGlossName, formatConfidence } from "@/lib/format";
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("translationHistory");
-    if (stored) {
-      setHistory(JSON.parse(stored));
+    const items = getHistoryMetadata();
+    console.log("[History] Loaded items:", items);
+    setHistory(items);
+  }, []);
+
+  // Load video when item is selected
+  useEffect(() => {
+    let currentUrl: string | null = null;
+    let isCancelled = false;
+
+    async function loadVideo() {
+      // Reset states
+      setVideoUrl(null);
+      setVideoError(null);
+
+      if (!selectedItem) return;
+
+      // Check if item has video
+      if (!selectedItem.hasVideo) {
+        console.log("[History] Item has no video:", selectedItem.id);
+        return;
+      }
+
+      setLoadingVideo(true);
+      console.log("[History] Loading video for item:", selectedItem.id);
+
+      try {
+        const url = await getVideoUrl(selectedItem.id);
+        
+        if (isCancelled) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+
+        if (url) {
+          console.log("[History] Video URL created:", url);
+          currentUrl = url;
+          setVideoUrl(url);
+        } else {
+          console.log("[History] No video blob found for item:", selectedItem.id);
+          setVideoError("Video not found in storage");
+        }
+      } catch (error) {
+        console.error("[History] Error loading video:", error);
+        if (!isCancelled) {
+          setVideoError("Failed to load video");
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingVideo(false);
+        }
+      }
+    }
+
+    loadVideo();
+
+    // Cleanup: revoke object URL when component unmounts or selection changes
+    return () => {
+      isCancelled = true;
+      if (currentUrl) {
+        console.log("[History] Revoking URL:", currentUrl);
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [selectedItem]);
+
+  const handleClearHistory = useCallback(async () => {
+    if (confirm("Are you sure you want to clear all history? This will also delete all saved videos.")) {
+      await clearAllHistory();
+      setHistory([]);
+      setSelectedItem(null);
+      setVideoUrl(null);
     }
   }, []);
 
-  const clearHistory = () => {
-    if (confirm("Are you sure you want to clear all history?")) {
-      localStorage.removeItem("translationHistory");
-      setHistory([]);
-      setSelectedItem(null);
-    }
-  };
-
-  const deleteItem = (id: number) => {
-    const updated = history.filter((item) => item.id !== id);
-    localStorage.setItem("translationHistory", JSON.stringify(updated));
+  const handleDeleteItem = useCallback(async (id: number) => {
+    const updated = await deleteHistoryItem(id);
     setHistory(updated);
     if (selectedItem?.id === id) {
       setSelectedItem(null);
+      setVideoUrl(null);
     }
-  };
+  }, [selectedItem]);
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -65,7 +127,7 @@ export default function HistoryPage() {
         </div>
         {history.length > 0 && (
           <button
-            onClick={clearHistory}
+            onClick={handleClearHistory}
             className="mt-4 sm:mt-0 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
           >
             Clear All History
@@ -112,6 +174,30 @@ export default function HistoryPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
+                      {/* Video indicator */}
+                      {item.hasVideo && (
+                        <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded bg-primary-100 dark:bg-primary-900/30">
+                          <svg
+                            className="w-4 h-4 text-primary-600 dark:text-primary-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </span>
+                      )}
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {formatGlossName(item.prediction)}
                       </h3>
@@ -135,7 +221,7 @@ export default function HistoryPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteItem(item.id);
+                      handleDeleteItem(item.id);
                     }}
                     className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                     aria-label="Delete"
@@ -157,72 +243,157 @@ export default function HistoryPage() {
           {/* Detail Panel */}
           <div className="lg:col-span-1">
             {selectedItem ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 sticky top-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                  Translation Details
-                </h3>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  {formatGlossName(selectedItem.prediction)}
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Confidence</span>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${
-                            selectedItem.confidence >= 0.8
-                              ? "bg-green-500"
-                              : selectedItem.confidence >= 0.5
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                          }`}
-                          style={{ width: `${selectedItem.confidence * 100}%` }}
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden sticky top-4">
+                {/* Video Player - Always show section */}
+                <div className="aspect-video bg-gray-900 relative">
+                  {!selectedItem.hasVideo ? (
+                    // No video saved for this item
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                      <svg
+                        className="w-12 h-12 mb-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                         />
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {formatConfidence(selectedItem.confidence)}
-                      </span>
+                      </svg>
+                      <p className="text-sm">No video saved</p>
+                      <p className="text-xs text-gray-500 mt-1">Older translations don&apos;t have videos</p>
                     </div>
-                  </div>
+                  ) : loadingVideo ? (
+                    // Loading state
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+                    </div>
+                  ) : videoError ? (
+                    // Error state
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-red-400">
+                      <svg
+                        className="w-12 h-12 mb-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                      <p className="text-sm">{videoError}</p>
+                    </div>
+                  ) : videoUrl ? (
+                    // Video player
+                    <video
+                      key={videoUrl}
+                      src={videoUrl}
+                      controls
+                      autoPlay
+                      muted
+                      className="w-full h-full object-contain"
+                      playsInline
+                      onError={(e) => {
+                        console.error("[History] Video playback error:", e);
+                        setVideoError("Failed to play video");
+                      }}
+                    />
+                  ) : (
+                    // Fallback - shouldn't reach here
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                      <p>Video not available</p>
+                    </div>
+                  )}
+                </div>
 
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Top 5 Predictions</span>
-                    <div className="mt-2 space-y-2">
-                      {selectedItem.top5.map((pred, idx) => (
-                        <div key={pred.gloss} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {idx + 1}. {formatGlossName(pred.gloss)}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">
-                            {formatConfidence(pred.confidence)}
-                          </span>
+                {/* Details */}
+                <div className="p-6">
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                    Translation Details
+                  </h3>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    {formatGlossName(selectedItem.prediction)}
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Confidence</span>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              selectedItem.confidence >= 0.8
+                                ? "bg-green-500"
+                                : selectedItem.confidence >= 0.5
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                            }`}
+                            style={{ width: `${selectedItem.confidence * 100}%` }}
+                          />
                         </div>
-                      ))}
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatConfidence(selectedItem.confidence)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">Source:</span>
-                      <p className="text-gray-900 dark:text-white mt-1 break-all">
-                        {selectedItem.source}
-                      </p>
-                    </div>
-                    <div className="text-sm mt-3">
-                      <span className="text-gray-500 dark:text-gray-400">Date:</span>
-                      <p className="text-gray-900 dark:text-white mt-1">
-                        {formatDate(selectedItem.timestamp)}
-                      </p>
+                    {selectedItem.top5 && selectedItem.top5.length > 0 && (
+                      <div>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Top 5 Predictions</span>
+                        <div className="mt-2 space-y-2">
+                          {selectedItem.top5.map((pred, idx) => (
+                            <div key={pred.gloss} className="flex items-center justify-between text-sm">
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {idx + 1}. {formatGlossName(pred.gloss)}
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400">
+                                {formatConfidence(pred.confidence)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Source:</span>
+                        <p className="text-gray-900 dark:text-white mt-1 break-all">
+                          {selectedItem.source}
+                        </p>
+                      </div>
+                      <div className="text-sm mt-3">
+                        <span className="text-gray-500 dark:text-gray-400">Date:</span>
+                        <p className="text-gray-900 dark:text-white mt-1">
+                          {formatDate(selectedItem.timestamp)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 p-6 text-center">
+                <svg
+                  className="w-12 h-12 text-gray-400 mx-auto mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
                 <p className="text-gray-500 dark:text-gray-400">
-                  Select a translation to view details
+                  Select a translation to view details and replay the video
                 </p>
               </div>
             )}

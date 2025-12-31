@@ -16,36 +16,52 @@ const nextConfig = {
     unoptimized: false,
   },
 
-  // Environment variables available on client-side
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  // Webpack configuration
+  webpack: (config, { isServer }) => {
+    // Don't bundle onnxruntime-web on server side at all
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('onnxruntime-web');
+      config.externals.push('@mediapipe/tasks-vision');
+    } else {
+      // Client-side: mark these as external to use dynamic imports
+      config.externals = {
+        ...config.externals,
+        'onnxruntime-node': 'commonjs onnxruntime-node',
+      };
+    }
+
+    // Handle WASM files
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+
+    // Don't process onnxruntime-web with Terser
+    config.module.rules.push({
+      test: /\.mjs$/,
+      include: /node_modules\/onnxruntime-web/,
+      type: 'javascript/auto',
+    });
+
+    return config;
   },
 
-  // Headers for security and CORS
+  // Transpile specific packages
+  transpilePackages: [],
+
+  // Headers for security and CORS - needed for SharedArrayBuffer
   async headers() {
     return [
       {
-        source: '/api/:path*',
+        source: '/:path*',
         headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
         ],
       },
     ];
   },
-
-  // Rewrites to proxy API calls (optional alternative to API routes)
-  // Uncomment if you prefer rewrites over API route proxying
-  // async rewrites() {
-  //   return [
-  //     {
-  //       source: '/backend/:path*',
-  //       destination: `${process.env.BACKEND_URL || 'http://localhost:8000'}/:path*`,
-  //     },
-  //   ];
-  // },
 };
 
 export default nextConfig;

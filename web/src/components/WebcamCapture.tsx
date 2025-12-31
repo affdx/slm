@@ -6,10 +6,12 @@ interface WebcamCaptureProps {
   onCapture: (video: Blob) => void;
   onRecordStart?: () => void;
   isProcessing: boolean;
+  isModelReady?: boolean;
 }
 
-export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: WebcamCaptureProps) {
+export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelReady = true }: WebcamCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -20,6 +22,18 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
+
+  // Stop webcam stream
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsStreaming(false);
+  }, []);
 
   // Start webcam stream
   const startStream = useCallback(async () => {
@@ -34,6 +48,7 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
         audio: false,
       });
 
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsStreaming(true);
@@ -48,16 +63,6 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
           setError(`Failed to access camera: ${err.message}`);
         }
       }
-    }
-  }, []);
-
-  // Stop webcam stream
-  const stopStream = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-      setIsStreaming(false);
     }
   }, []);
 
@@ -154,15 +159,28 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
     }
   }, [recordedBlob, onCapture]);
 
-  // Cleanup on unmount
+  // Auto-start webcam when component mounts, stop when unmounting
+  useEffect(() => {
+    startStream();
+
+    // Cleanup: stop stream when component unmounts (user switches away from webcam tab)
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount/unmount
+  
+  // Cleanup preview URL when it changes
   useEffect(() => {
     return () => {
-      stopStream();
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [stopStream, previewUrl]);
+  }, [previewUrl]);
 
   return (
     <div className="space-y-4">
@@ -175,22 +193,10 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
 
       {/* Video Display */}
       <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video">
-        {!isStreaming && !recordedBlob && (
+        {!isStreaming && !recordedBlob && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-            <svg
-              className="w-16 h-16 text-gray-400 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="text-gray-400">Camera not started</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-white mb-4"></div>
+            <p className="text-gray-400">Starting camera...</p>
           </div>
         )}
 
@@ -226,39 +232,14 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
 
       {/* Controls */}
       <div className="flex flex-wrap gap-3 justify-center">
-        {!isStreaming && !recordedBlob && (
-          <button
-            onClick={startStream}
-            className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <span>Start Camera</span>
-          </button>
-        )}
-
         {isStreaming && !isRecording && !recordedBlob && countdown === null && (
-          <>
-            <button
-              onClick={startRecording}
-              className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-            >
-              <span className="w-3 h-3 bg-white rounded-full"></span>
-              <span>Record (3s countdown)</span>
-            </button>
-            <button
-              onClick={stopStream}
-              className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Stop Camera
-            </button>
-          </>
+          <button
+            onClick={startRecording}
+            className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+          >
+            <span className="w-3 h-3 bg-white rounded-full"></span>
+            <span>Record (3s countdown)</span>
+          </button>
         )}
 
         {isRecording && (
@@ -277,10 +258,10 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing }: Webcam
           <>
             <button
               onClick={handleSubmit}
-              disabled={isProcessing}
+              disabled={isProcessing || !isModelReady}
               className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isProcessing ? "Processing..." : "Translate Sign Language"}
+              {isProcessing ? "Processing..." : !isModelReady ? "Loading model..." : "Translate Sign Language"}
             </button>
             <button
               onClick={resetRecording}

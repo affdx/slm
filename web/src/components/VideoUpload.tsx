@@ -6,9 +6,10 @@ interface VideoUploadProps {
   onSubmit: (video: Blob, filename?: string) => void;
   onFileChange?: () => void;
   isProcessing: boolean;
+  isModelReady?: boolean;
 }
 
-export function VideoUpload({ onSubmit, onFileChange, isProcessing }: VideoUploadProps) {
+export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady = true }: VideoUploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -186,10 +187,10 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing }: VideoUploa
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={isProcessing}
+            disabled={isProcessing || !isModelReady}
             className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isProcessing ? "Processing..." : "Translate Sign Language"}
+            {isProcessing ? "Processing..." : !isModelReady ? "Loading model..." : "Translate Sign Language"}
           </button>
         </div>
       )}
