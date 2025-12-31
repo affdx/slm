@@ -66,6 +66,29 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
     }
   }, []);
 
+  /**
+   * Get supported MIME type for MediaRecorder
+   * Firefox doesn't support VP9, so we fall back to VP8 or default
+   */
+  const getSupportedMimeType = useCallback((): string | undefined => {
+    const mimeTypes = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+      "video/mp4",
+    ];
+    
+    for (const mimeType of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        console.log(`[WebcamCapture] Using MIME type: ${mimeType}`);
+        return mimeType;
+      }
+    }
+    
+    console.log("[WebcamCapture] No specific MIME type supported, using default");
+    return undefined; // Let browser choose default
+  }, []);
+
   // Start recording with countdown
   const startRecording = useCallback(() => {
     if (!videoRef.current?.srcObject) return;
@@ -87,9 +110,12 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
 
     setTimeout(() => {
       const stream = videoRef.current!.srcObject as MediaStream;
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9",
-      });
+      
+      // Get supported MIME type for cross-browser compatibility
+      const mimeType = getSupportedMimeType();
+      const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
 
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -101,7 +127,9 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        // Use the actual MIME type from recorder for the blob
+        const blobType = mediaRecorder.mimeType || "video/webm";
+        const blob = new Blob(chunksRef.current, { type: blobType });
         setRecordedBlob(blob);
         if (previewUrl) {
           URL.revokeObjectURL(previewUrl);
@@ -134,7 +162,7 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         }
       };
     }, 3000);
-  }, [previewUrl, onRecordStart]);
+  }, [previewUrl, onRecordStart, getSupportedMimeType]);
 
   // Stop recording
   const stopRecording = useCallback(() => {

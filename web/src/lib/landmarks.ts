@@ -32,16 +32,54 @@ const NUM_FRAMES = 30;
 let poseLandmarker: PoseLandmarker | null = null;
 let handLandmarker: HandLandmarker | null = null;
 let initPromise: Promise<void> | null = null;
+let currentDelegate: "GPU" | "CPU" = "GPU";
+
+// LocalStorage key for delegate preference
+const DELEGATE_STORAGE_KEY = "mediapipe-delegate";
 
 /**
- * Initialize MediaPipe landmarkers
+ * Get saved delegate preference from localStorage
  */
-async function initializeLandmarkers(): Promise<void> {
-  if (poseLandmarker && handLandmarker) {
+function getSavedDelegate(): "GPU" | "CPU" {
+  if (typeof localStorage === "undefined") return "GPU";
+  const saved = localStorage.getItem(DELEGATE_STORAGE_KEY);
+  return saved === "CPU" ? "CPU" : "GPU";
+}
+
+/**
+ * Save delegate preference to localStorage
+ */
+function saveDelegate(delegate: "GPU" | "CPU"): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(DELEGATE_STORAGE_KEY, delegate);
+}
+
+/**
+ * Initialize MediaPipe landmarkers with specified delegate
+ */
+async function initializeLandmarkers(delegate?: "GPU" | "CPU"): Promise<void> {
+  const targetDelegate = delegate ?? getSavedDelegate();
+  
+  // If already initialized with same delegate, skip
+  if (poseLandmarker && handLandmarker && currentDelegate === targetDelegate) {
     return;
   }
 
-  console.log("[MediaPipe] Initializing landmarkers...");
+  // If switching delegates, close existing landmarkers
+  if (poseLandmarker || handLandmarker) {
+    console.log(`[MediaPipe] Switching delegate from ${currentDelegate} to ${targetDelegate}`);
+    if (poseLandmarker) {
+      poseLandmarker.close();
+      poseLandmarker = null;
+    }
+    if (handLandmarker) {
+      handLandmarker.close();
+      handLandmarker = null;
+    }
+    initPromise = null;
+  }
+
+  console.log(`[MediaPipe] Initializing landmarkers with ${targetDelegate} delegate...`);
   const startTime = performance.now();
 
   // Dynamic import
@@ -53,12 +91,12 @@ async function initializeLandmarkers(): Promise<void> {
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
   );
 
-  // Initialize Pose Landmarker with outputSegmentationMasks to get visibility
+  // Initialize Pose Landmarker
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath:
         "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-      delegate: "GPU",
+      delegate: targetDelegate,
     },
     runningMode: "VIDEO",
     numPoses: 1,
@@ -72,7 +110,7 @@ async function initializeLandmarkers(): Promise<void> {
     baseOptions: {
       modelAssetPath:
         "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-      delegate: "GPU",
+      delegate: targetDelegate,
     },
     runningMode: "VIDEO",
     numHands: 2,
@@ -81,9 +119,12 @@ async function initializeLandmarkers(): Promise<void> {
     minTrackingConfidence: 0.5,
   });
 
+  currentDelegate = targetDelegate;
+  saveDelegate(targetDelegate);
+
   const loadTime = performance.now() - startTime;
   console.log(
-    `[MediaPipe] Landmarkers initialized in ${loadTime.toFixed(0)}ms`
+    `[MediaPipe] Landmarkers initialized with ${targetDelegate} delegate in ${loadTime.toFixed(0)}ms`
   );
 }
 
@@ -361,4 +402,29 @@ export function getFeatureDimensions() {
     handFeatures: HAND_FEATURES,
     totalLength: NUM_FRAMES * TOTAL_FEATURES,
   };
+}
+
+/**
+ * Get current delegate being used
+ */
+export function getCurrentDelegate(): "GPU" | "CPU" {
+  return currentDelegate;
+}
+
+/**
+ * Set delegate and reinitialize landmarkers
+ * Call this to switch between GPU and CPU processing
+ */
+export async function setDelegate(delegate: "GPU" | "CPU"): Promise<void> {
+  initPromise = initializeLandmarkers(delegate);
+  await initPromise;
+}
+
+/**
+ * Toggle between GPU and CPU delegate
+ */
+export async function toggleDelegate(): Promise<"GPU" | "CPU"> {
+  const newDelegate = currentDelegate === "GPU" ? "CPU" : "GPU";
+  await setDelegate(newDelegate);
+  return newDelegate;
 }

@@ -23,8 +23,15 @@ export default function TranslatePage() {
   const currentVideoBlobRef = useRef<Blob | null>(null);
 
   // Client-side inference hook
-  const { isReady, isLoading, loadingProgress, error: modelError, predict } =
-    useSignLanguageInference();
+  const { 
+    isReady, 
+    isLoading, 
+    loadingProgress, 
+    error: modelError, 
+    delegate,
+    predict,
+    switchDelegate,
+  } = useSignLanguageInference();
 
   const clearResults = useCallback(() => {
     setResult(null);
@@ -78,6 +85,39 @@ export default function TranslatePage() {
             <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
             Client-side inference (no server required)
           </div>
+
+          {/* Processing Mode Toggle */}
+          {isReady && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Processing:</span>
+              <button
+                onClick={() => switchDelegate(delegate === "GPU" ? "CPU" : "GPU")}
+                disabled={isLoading || isProcessing}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${delegate === "GPU" 
+                    ? "bg-primary-600" 
+                    : "bg-gray-300 dark:bg-gray-600"
+                  }
+                  ${(isLoading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                `}
+                title={`Currently using ${delegate}. Click to switch to ${delegate === "GPU" ? "CPU" : "GPU"}.`}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${delegate === "GPU" ? "translate-x-6" : "translate-x-1"}
+                  `}
+                />
+              </button>
+              <span className={`text-xs font-medium ${delegate === "GPU" ? "text-primary-600" : "text-gray-600 dark:text-gray-400"}`}>
+                {delegate}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                ({delegate === "GPU" ? "faster" : "compatible"})
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Model Loading State */}

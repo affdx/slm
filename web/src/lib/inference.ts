@@ -86,7 +86,7 @@ async function getOrt(): Promise<OrtModule> {
   if (typeof window !== "undefined" && (window as unknown as { ort: OrtModule }).ort) {
     ortModule = (window as unknown as { ort: OrtModule }).ort;
     
-    // Configure ONNX Runtime - use WASM only for reliability
+    // Configure ONNX Runtime - use WASM backend for reliability
     ortModule.env.wasm.numThreads = 1;
     ortModule.env.wasm.simd = true;
     

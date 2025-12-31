@@ -18,6 +18,8 @@ import {
   extractLandmarksFromBlob,
   preloadLandmarkers,
   areLandmarkersReady,
+  getCurrentDelegate,
+  setDelegate,
 } from "@/lib/landmarks";
 
 export interface PredictionResult {
@@ -38,10 +40,12 @@ export interface UseSignLanguageInferenceReturn {
   isLoading: boolean;
   loadingProgress: string;
   error: string | null;
+  delegate: "GPU" | "CPU";
 
   // Actions
   predict: (videoBlob: Blob) => Promise<PredictionResult>;
   initialize: () => Promise<void>;
+  switchDelegate: (delegate: "GPU" | "CPU") => Promise<void>;
 
   // Utilities
   getGlossList: () => Promise<string[]>;
@@ -55,6 +59,7 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [delegate, setDelegateState] = useState<"GPU" | "CPU">("GPU");
   const initializingRef = useRef(false);
 
   /**
@@ -72,6 +77,7 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
     try {
       setLoadingProgress("Loading MediaPipe models...");
       await preloadLandmarkers();
+      setDelegateState(getCurrentDelegate());
 
       setLoadingProgress("Loading ONNX model...");
       await preloadModel();
@@ -136,6 +142,30 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
     return getGlosses();
   }, []);
 
+  /**
+   * Switch between GPU and CPU delegate for MediaPipe
+   */
+  const switchDelegate = useCallback(async (newDelegate: "GPU" | "CPU") => {
+    if (newDelegate === delegate) return;
+    
+    setIsLoading(true);
+    setLoadingProgress(`Switching to ${newDelegate} processing...`);
+    setError(null);
+
+    try {
+      await setDelegate(newDelegate);
+      setDelegateState(newDelegate);
+      setLoadingProgress("");
+      console.log(`[Hook] Switched to ${newDelegate} delegate`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to switch delegate";
+      setError(message);
+      console.error("[Hook] Failed to switch delegate:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [delegate]);
+
   // Auto-initialize on mount (optional - can be disabled for lazy loading)
   useEffect(() => {
     // Check if already loaded
@@ -153,8 +183,10 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
     isLoading,
     loadingProgress,
     error,
+    delegate,
     predict,
     initialize,
+    switchDelegate,
     getGlossList,
   };
 }
