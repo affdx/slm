@@ -20,7 +20,9 @@ import {
 import {
   preloadLandmarkers,
   areLandmarkersReady,
-  extractLandmarksFromFrame,
+  extractLandmarksWithDrawingData,
+  drawLandmarks,
+  type DrawingData,
 } from "@/lib/landmarks";
 
 // Configuration matching Python demo
@@ -42,6 +44,8 @@ export interface RealtimePrediction {
   bufferProgress: number; // 0-1 progress of frame buffer
 }
 
+export { type DrawingData } from "@/lib/landmarks";
+
 export interface UseRealtimeInferenceReturn {
   // State
   isReady: boolean;
@@ -50,15 +54,18 @@ export interface UseRealtimeInferenceReturn {
   error: string | null;
   isProcessing: boolean;
   prediction: RealtimePrediction | null;
+  drawingData: DrawingData | null;
 
   // Actions
   initialize: () => Promise<void>;
-  startProcessing: (videoElement: HTMLVideoElement, canvas: HTMLCanvasElement) => void;
+  startProcessing: (videoElement: HTMLVideoElement, canvas: HTMLCanvasElement, overlayCanvas?: HTMLCanvasElement) => void;
   stopProcessing: () => void;
   reset: () => void;
+  setShowSkeleton: (show: boolean) => void;
 
   // Config
   config: typeof CONFIG;
+  showSkeleton: boolean;
 }
 
 /**
@@ -71,6 +78,8 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [prediction, setPrediction] = useState<RealtimePrediction | null>(null);
+  const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState(true);
 
   // Refs for processing state (avoid re-renders during processing)
   const processingRef = useRef(false);
@@ -79,6 +88,8 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
   const prevLandmarksRef = useRef<Float32Array | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const initializingRef = useRef(false);
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const showSkeletonRef = useRef(true);
 
   /**
    * Initialize models
@@ -173,9 +184,32 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
       
       ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-      // Extract landmarks from current frame
-      const landmarks = await extractLandmarksFromFrame(canvas);
+      // Extract landmarks with drawing data from current frame
+      const { features: landmarks, drawingData: currentDrawingData } = await extractLandmarksWithDrawingData(canvas);
       
+      // Update drawing data state
+      setDrawingData(currentDrawingData);
+
+      // Draw skeleton overlay if enabled
+      if (showSkeletonRef.current && overlayCanvasRef.current) {
+        const overlayCtx = overlayCanvasRef.current.getContext("2d");
+        if (overlayCtx) {
+          // Clear previous frame
+          overlayCtx.clearRect(0, 0, overlayCanvasRef.current.width, overlayCanvasRef.current.height);
+          
+          // Draw landmarks
+          drawLandmarks(overlayCtx, currentDrawingData, overlayCanvasRef.current.width, overlayCanvasRef.current.height, {
+            showPose: true,
+            showHands: true,
+            poseColor: "rgba(0, 255, 0, 0.7)",
+            leftHandColor: "rgba(255, 0, 0, 0.9)",
+            rightHandColor: "rgba(0, 100, 255, 0.9)",
+            lineWidth: 3,
+            pointRadius: 5,
+          });
+        }
+      }
+
       // Check if hands are detected
       const handsDetected = checkHandsDetected(landmarks);
 
@@ -275,12 +309,13 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
    */
   const startProcessing = useCallback((
     videoElement: HTMLVideoElement,
-    canvas: HTMLCanvasElement
+    canvas: HTMLCanvasElement,
+    overlayCanvas?: HTMLCanvasElement
   ) => {
     if (!isReady) {
       console.warn("[RealtimeInference] Not ready, initializing first...");
       initialize().then(() => {
-        startProcessing(videoElement, canvas);
+        startProcessing(videoElement, canvas, overlayCanvas);
       });
       return;
     }
@@ -292,6 +327,13 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
     // Set canvas size to match video
     canvas.width = videoElement.videoWidth || 640;
     canvas.height = videoElement.videoHeight || 480;
+
+    // Set overlay canvas size and store reference
+    if (overlayCanvas) {
+      overlayCanvas.width = videoElement.videoWidth || 640;
+      overlayCanvas.height = videoElement.videoHeight || 480;
+      overlayCanvasRef.current = overlayCanvas;
+    }
 
     // Start processing loop
     processFrame(videoElement, canvas);
@@ -319,6 +361,31 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
     predictionHistoryRef.current = [];
     prevLandmarksRef.current = null;
     setPrediction(null);
+    setDrawingData(null);
+    
+    // Clear overlay canvas
+    if (overlayCanvasRef.current) {
+      const ctx = overlayCanvasRef.current.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, overlayCanvasRef.current.width, overlayCanvasRef.current.height);
+      }
+    }
+  }, []);
+
+  /**
+   * Toggle skeleton visibility
+   */
+  const handleSetShowSkeleton = useCallback((show: boolean) => {
+    setShowSkeleton(show);
+    showSkeletonRef.current = show;
+    
+    // Clear overlay if hiding skeleton
+    if (!show && overlayCanvasRef.current) {
+      const ctx = overlayCanvasRef.current.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, overlayCanvasRef.current.width, overlayCanvasRef.current.height);
+      }
+    }
   }, []);
 
   // Cleanup on unmount
@@ -344,10 +411,13 @@ export function useRealtimeInference(): UseRealtimeInferenceReturn {
     error,
     isProcessing,
     prediction,
+    drawingData,
     initialize,
     startProcessing,
     stopProcessing,
     reset,
+    setShowSkeleton: handleSetShowSkeleton,
     config: CONFIG,
+    showSkeleton,
   };
 }

@@ -452,3 +452,211 @@ export async function extractLandmarksFromFrame(
 
   return extractFrameLandmarks(poseResult, handResult);
 }
+
+/**
+ * Landmark point for drawing
+ */
+export interface LandmarkPoint {
+  x: number;
+  y: number;
+  z: number;
+  visibility?: number;
+}
+
+/**
+ * Drawing data for visualization
+ */
+export interface DrawingData {
+  pose: LandmarkPoint[] | null;
+  leftHand: LandmarkPoint[] | null;
+  rightHand: LandmarkPoint[] | null;
+}
+
+/**
+ * Result from landmark extraction with drawing data
+ */
+export interface LandmarkExtractionResult {
+  features: Float32Array;
+  drawingData: DrawingData;
+}
+
+// Pose connections for drawing skeleton lines
+export const POSE_CONNECTIONS: [number, number][] = [
+  // Face
+  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
+  // Torso
+  [9, 10], [11, 12], [11, 23], [12, 24], [23, 24],
+  // Left arm
+  [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+  // Right arm
+  [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+  // Left leg
+  [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
+  // Right leg
+  [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
+];
+
+// Hand connections for drawing skeleton lines
+export const HAND_CONNECTIONS: [number, number][] = [
+  // Thumb
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  // Index finger
+  [0, 5], [5, 6], [6, 7], [7, 8],
+  // Middle finger
+  [0, 9], [9, 10], [10, 11], [11, 12],
+  // Ring finger
+  [0, 13], [13, 14], [14, 15], [15, 16],
+  // Pinky
+  [0, 17], [17, 18], [18, 19], [19, 20],
+  // Palm
+  [5, 9], [9, 13], [13, 17],
+];
+
+/**
+ * Extract landmarks from a single canvas frame with drawing data
+ * Returns both the feature array for inference AND raw landmark positions for visualization
+ * 
+ * @param canvas - Canvas element with current frame drawn
+ * @returns Object with features array and drawing data
+ */
+export async function extractLandmarksWithDrawingData(
+  canvas: HTMLCanvasElement
+): Promise<LandmarkExtractionResult> {
+  await ensureLandmarkersReady();
+
+  if (!poseLandmarker || !handLandmarker) {
+    throw new Error("Landmarkers not initialized");
+  }
+
+  // Use monotonically increasing timestamp for VIDEO mode
+  const timestampMs = performance.now();
+  const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
+  const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
+
+  // Extract features for inference
+  const features = extractFrameLandmarks(poseResult, handResult);
+
+  // Extract drawing data
+  const drawingData: DrawingData = {
+    pose: null,
+    leftHand: null,
+    rightHand: null,
+  };
+
+  // Pose landmarks
+  if (poseResult.landmarks && poseResult.landmarks.length > 0) {
+    const worldLandmarks = poseResult.worldLandmarks?.[0];
+    drawingData.pose = poseResult.landmarks[0].map((lm, i) => ({
+      x: lm.x,
+      y: lm.y,
+      z: lm.z,
+      visibility: (worldLandmarks?.[i] as { visibility?: number })?.visibility,
+    }));
+  }
+
+  // Hand landmarks - determine left/right based on handedness
+  if (handResult.landmarks && handResult.handedness) {
+    for (let i = 0; i < handResult.landmarks.length; i++) {
+      const handedness = handResult.handedness[i];
+      if (handedness && handedness.length > 0) {
+        const label = handedness[0].categoryName;
+        const landmarks = handResult.landmarks[i].map((lm) => ({
+          x: lm.x,
+          y: lm.y,
+          z: lm.z,
+        }));
+
+        if (label === "Left") {
+          drawingData.leftHand = landmarks;
+        } else if (label === "Right") {
+          drawingData.rightHand = landmarks;
+        }
+      }
+    }
+  }
+
+  return { features, drawingData };
+}
+
+/**
+ * Draw landmarks on a canvas
+ * 
+ * @param ctx - Canvas 2D context
+ * @param drawingData - Landmark drawing data
+ * @param width - Canvas width
+ * @param height - Canvas height
+ * @param options - Drawing options
+ */
+export function drawLandmarks(
+  ctx: CanvasRenderingContext2D,
+  drawingData: DrawingData,
+  width: number,
+  height: number,
+  options: {
+    showPose?: boolean;
+    showHands?: boolean;
+    poseColor?: string;
+    leftHandColor?: string;
+    rightHandColor?: string;
+    lineWidth?: number;
+    pointRadius?: number;
+  } = {}
+): void {
+  const {
+    showPose = true,
+    showHands = true,
+    poseColor = "#00FF00",
+    leftHandColor = "#FF0000",
+    rightHandColor = "#0000FF",
+    lineWidth = 2,
+    pointRadius = 4,
+  } = options;
+
+  // Helper to draw connections
+  const drawConnections = (
+    landmarks: LandmarkPoint[],
+    connections: [number, number][],
+    color: string
+  ) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+
+    for (const [start, end] of connections) {
+      if (landmarks[start] && landmarks[end]) {
+        ctx.beginPath();
+        ctx.moveTo(landmarks[start].x * width, landmarks[start].y * height);
+        ctx.lineTo(landmarks[end].x * width, landmarks[end].y * height);
+        ctx.stroke();
+      }
+    }
+  };
+
+  // Helper to draw points
+  const drawPoints = (landmarks: LandmarkPoint[], color: string) => {
+    ctx.fillStyle = color;
+
+    for (const lm of landmarks) {
+      ctx.beginPath();
+      ctx.arc(lm.x * width, lm.y * height, pointRadius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  };
+
+  // Draw pose
+  if (showPose && drawingData.pose) {
+    drawConnections(drawingData.pose, POSE_CONNECTIONS, poseColor);
+    drawPoints(drawingData.pose, poseColor);
+  }
+
+  // Draw hands
+  if (showHands) {
+    if (drawingData.leftHand) {
+      drawConnections(drawingData.leftHand, HAND_CONNECTIONS, leftHandColor);
+      drawPoints(drawingData.leftHand, leftHandColor);
+    }
+    if (drawingData.rightHand) {
+      drawConnections(drawingData.rightHand, HAND_CONNECTIONS, rightHandColor);
+      drawPoints(drawingData.rightHand, rightHandColor);
+    }
+  }
+}
