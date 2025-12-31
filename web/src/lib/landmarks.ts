@@ -428,3 +428,27 @@ export async function toggleDelegate(): Promise<"GPU" | "CPU"> {
   await setDelegate(newDelegate);
   return newDelegate;
 }
+
+/**
+ * Extract landmarks from a single canvas frame (for real-time processing)
+ * This is optimized for continuous webcam processing.
+ * 
+ * @param canvas - Canvas element with current frame drawn
+ * @returns Float32Array of 258 features for single frame
+ */
+export async function extractLandmarksFromFrame(
+  canvas: HTMLCanvasElement
+): Promise<Float32Array> {
+  await ensureLandmarkersReady();
+
+  if (!poseLandmarker || !handLandmarker) {
+    throw new Error("Landmarkers not initialized");
+  }
+
+  // Use monotonically increasing timestamp for VIDEO mode
+  const timestampMs = performance.now();
+  const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
+  const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
+
+  return extractFrameLandmarks(poseResult, handResult);
+}
