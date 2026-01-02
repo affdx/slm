@@ -2,11 +2,19 @@
  * Real-time webcam capture component with improved UX.
  *
  * Features:
+ * - First-time onboarding overlay with quick-start guide (visible above fold)
+ * - Sign history pills always visible at top once detection started
+ * - Controls (stop, reset, skeleton) inside video frame as icon buttons
  * - Clear visual state indicators
- * - Horizontal pill list for recent signs at top
  * - Distance feedback (too far/too close)
- * - Dynamic instructions always visible
+ * - Instructions displayed inside video overlay
  * - Circular progress ring
+ * 
+ * UX Best Practices Applied:
+ * - Just-in-time instructions on video overlay
+ * - Controls within video frame for compact layout
+ * - Sign history prominently displayed at top
+ * - Returning user gets simplified UI
  */
 
 "use client";
@@ -162,6 +170,7 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasStartedOnce, setHasStartedOnce] = useState(false); // Track if user has started before
 
   const {
     isReady,
@@ -238,6 +247,7 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
   const handleStart = useCallback(() => {
     if (videoRef.current && canvasRef.current && isReady) {
       reset();
+      setHasStartedOnce(true);
       startProcessing(videoRef.current, canvasRef.current, overlayCanvasRef.current || undefined);
     }
   }, [isReady, reset, startProcessing]);
@@ -273,40 +283,42 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
         </div>
       )}
 
-      {/* Sign History Pills - Always visible to prevent layout shift */}
-      <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg p-3 min-h-[88px]">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400 font-medium">Detected Signs:</span>
-          {signHistory.length > 0 && (
-            <button
-              onClick={clearHistory}
-              className="text-xs text-gray-500 hover:text-white transition-colors"
-            >
-              Clear
-            </button>
+      {/* Sign History Pills - Always visible at top once detection has started */}
+      {hasStartedOnce && (
+        <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-400 font-medium">Detected Signs:</span>
+            {signHistory.length > 0 && (
+              <button
+                onClick={clearHistory}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {signHistory.length > 0 ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {signHistory.slice(0, 8).map((sign, index) => (
+                  <SignPill key={sign.timestamp} sign={sign} isLatest={index === 0} />
+                ))}
+              </div>
+              {/* Sentence preview */}
+              <div className="mt-3 pt-2 border-t border-gray-700">
+                <p className="text-sm text-gray-300">
+                  <span className="text-gray-500">Sentence: </span>
+                  {signHistory.slice().reverse().map(s => s.gloss).join(" ")}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-10 text-gray-500 text-sm">
+              Signs will appear here as you sign...
+            </div>
           )}
         </div>
-        {signHistory.length > 0 ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {signHistory.slice(0, 8).map((sign, index) => (
-                <SignPill key={sign.timestamp} sign={sign} isLatest={index === 0} />
-              ))}
-            </div>
-            {/* Sentence preview */}
-            <div className="mt-3 pt-2 border-t border-gray-700">
-              <p className="text-sm text-gray-300">
-                <span className="text-gray-500">Sentence: </span>
-                {signHistory.slice().reverse().map(s => s.gloss).join(" ")}
-              </p>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-10 text-gray-500 text-sm">
-            Signs will appear here as you sign...
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Main Video Area */}
       <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video">
@@ -314,6 +326,78 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-white mb-4"></div>
             <p className="text-gray-400">Starting camera...</p>
+          </div>
+        )}
+
+        {/* First-time Onboarding Overlay - Shows before detection starts */}
+        {isStreaming && !isProcessing && !hasStartedOnce && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-gradient-to-t from-black/90 via-black/60 to-black/40">
+            {/* Quick Start Guide */}
+            <div className="text-center px-6 max-w-md">
+              <div className="mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500 mb-4">
+                  <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Ready to Translate</h3>
+                <p className="text-gray-300 text-sm mb-4">
+                  Sign in front of the camera and we will translate in real-time
+                </p>
+              </div>
+
+              {/* Quick steps - horizontal on larger screens */}
+              <div className="grid grid-cols-3 gap-3 mb-6 text-xs">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center mb-1.5">
+                    <span className="text-blue-400 font-bold">1</span>
+                  </div>
+                  <span className="text-gray-400">Show hands</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center mb-1.5">
+                    <span className="text-blue-400 font-bold">2</span>
+                  </div>
+                  <span className="text-gray-400">Start signing</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center mb-1.5">
+                    <span className="text-blue-400 font-bold">3</span>
+                  </div>
+                  <span className="text-gray-400">See translation</span>
+                </div>
+              </div>
+
+              {/* Big Start Button */}
+              <button
+                onClick={handleStart}
+                disabled={!isReady || isLoading}
+                className="px-8 py-4 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 flex items-center justify-center mx-auto space-x-3 shadow-lg shadow-green-500/30"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Start Detection</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Returning User Overlay - Simplified for users who've used it before */}
+        {isStreaming && !isProcessing && hasStartedOnce && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50">
+            <button
+              onClick={handleStart}
+              disabled={!isReady || isLoading}
+              className="px-8 py-4 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 flex items-center space-x-3 shadow-lg shadow-green-500/30"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Resume Detection</span>
+            </button>
           </div>
         )}
 
@@ -337,6 +421,44 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
         {/* Hidden canvas for processing */}
         <canvas ref={canvasRef} className="hidden" />
 
+        {/* Controls inside video - Top Right */}
+        {isProcessing && (
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+            <button
+              onClick={() => setShowSkeleton(!showSkeleton)}
+              className={`p-2 rounded-full transition-colors ${
+                showSkeleton
+                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                  : "bg-black/50 text-white hover:bg-black/70"
+              }`}
+              title={showSkeleton ? "Hide Skeleton" : "Show Skeleton"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+            <button
+              onClick={reset}
+              className="p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              title="Reset"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={stopProcessing}
+              className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+              title="Stop Detection"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* State Badge - Top Left */}
         {isProcessing && (
           <div className="absolute top-4 left-4">
@@ -353,6 +475,16 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
               {detectionState === "DETECTED" && (
                 <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {detectionState === "WAITING_FOR_HANDS" && (
+                <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+                </svg>
+              )}
+              {detectionState === "COOLDOWN" && (
+                <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               )}
               <span className={`text-sm font-medium ${stateConfig.color}`}>
@@ -430,122 +562,16 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
             )}
           </div>
         )}
-      </div>
 
-      {/* Dynamic Instructions - Always visible during processing */}
-      <div className={`p-4 rounded-lg border ${stateConfig.bgColor} ${stateConfig.borderColor}`}>
-        <div className="flex items-center gap-3">
-          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${stateConfig.bgColor} border ${stateConfig.borderColor}`}>
-            {detectionState === "IDLE" && (
-              <svg className={`w-5 h-5 ${stateConfig.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              </svg>
-            )}
-            {detectionState === "WAITING_FOR_HANDS" && (
-              <svg className={`w-5 h-5 ${stateConfig.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-              </svg>
-            )}
-            {detectionState === "COLLECTING" && (
-              <div className="relative w-5 h-5">
-                <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50"></div>
-                <div className="relative rounded-full w-5 h-5 bg-red-500"></div>
-              </div>
-            )}
-            {detectionState === "ANALYZING" && (
-              <svg className={`w-5 h-5 ${stateConfig.color} animate-spin`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            )}
-            {detectionState === "DETECTED" && (
-              <svg className={`w-5 h-5 ${stateConfig.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {detectionState === "COOLDOWN" && (
-              <svg className={`w-5 h-5 ${stateConfig.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )}
-          </div>
-          <div className="flex-1">
-            <p className={`font-semibold ${stateConfig.color}`}>{stateConfig.label}</p>
-            <p className="text-sm text-gray-400">{stateConfig.instruction}</p>
-          </div>
-          {isProcessing && detectionState === "COLLECTING" && (
-            <div className="flex-shrink-0">
-              <CircularProgress
-                progress={prediction?.bufferProgress || 0}
-                size={48}
-                strokeWidth={4}
-                color="text-blue-400"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap gap-3 justify-center">
-        {isStreaming && !isProcessing && (
-          <button
-            onClick={handleStart}
-            disabled={!isReady || isLoading}
-            className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Start Detection</span>
-          </button>
-        )}
-
+        {/* Instruction Bar - Bottom Center (inside video) */}
         {isProcessing && (
-          <>
-            <button
-              onClick={stopProcessing}
-              className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
-              <span>Stop</span>
-            </button>
-            <button
-              onClick={reset}
-              className="px-4 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Reset
-            </button>
-          </>
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+            <div className={`px-4 py-2 rounded-full ${stateConfig.bgColor} border ${stateConfig.borderColor} backdrop-blur-sm`}>
+              <p className={`text-sm font-medium ${stateConfig.color}`}>{stateConfig.instruction}</p>
+            </div>
+          </div>
         )}
-
-        <button
-          onClick={() => setShowSkeleton(!showSkeleton)}
-          className={`px-4 py-3 font-medium rounded-lg transition-colors text-sm ${
-            showSkeleton
-              ? "bg-purple-600 text-white hover:bg-purple-700"
-              : "bg-gray-600 text-white hover:bg-gray-700"
-          }`}
-        >
-          {showSkeleton ? "Hide Skeleton" : "Show Skeleton"}
-        </button>
       </div>
-
-      {/* Help Section - Only when not processing */}
-      {!isProcessing && (
-        <div className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 text-sm">
-          <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">How to use:</p>
-          <ol className="text-gray-600 dark:text-gray-400 space-y-1 list-decimal list-inside">
-            <li>Click <strong>Start Detection</strong> to begin</li>
-            <li>Position yourself at a comfortable distance from the camera</li>
-            <li>Show your hands and start signing</li>
-            <li>Keep signing until the progress reaches 100%</li>
-            <li>See the detected sign appear, then continue with the next sign</li>
-          </ol>
-        </div>
-      )}
     </div>
   );
 }
