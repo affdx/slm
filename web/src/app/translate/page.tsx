@@ -11,7 +11,7 @@ import {
   useSignLanguageInference,
   PredictionResult,
 } from "@/hooks/useSignLanguageInference";
-import { RealtimePrediction } from "@/hooks/useRealtimeInference";
+import { DetectedSign } from "@/hooks/useRealtimeInference";
 import { addHistoryItem } from "@/lib/history";
 
 type InputMode = "upload" | "webcam" | "realtime";
@@ -22,7 +22,7 @@ export default function TranslatePage() {
   const [uploadSubMode, setUploadSubMode] = useState<UploadSubMode>("quick");
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
-  const [realtimePrediction, setRealtimePrediction] = useState<RealtimePrediction | null>(null);
+  const [realtimePrediction, setRealtimePrediction] = useState<DetectedSign | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Store selected video for demo mode
@@ -53,8 +53,8 @@ export default function TranslatePage() {
     currentVideoBlobRef.current = null;
   }, []);
 
-  const handleRealtimePrediction = useCallback((prediction: RealtimePrediction) => {
-    setRealtimePrediction(prediction);
+  const handleRealtimePrediction = useCallback((sign: DetectedSign) => {
+    setRealtimePrediction(sign);
   }, []);
 
   const handleVideoSubmit = useCallback(
@@ -307,13 +307,13 @@ export default function TranslatePage() {
         {/* Result Display */}
         {result && !isProcessing && mode !== "realtime" && <TranslationResult result={result} />}
 
-        {/* Real-time Mode Info Card */}
-        {mode === "realtime" && realtimePrediction && realtimePrediction.isStable && realtimePrediction.confidence >= 0.7 && (
+        {/* Real-time Mode Info Card - Show latest detected sign */}
+        {mode === "realtime" && realtimePrediction && (
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-green-600 dark:text-green-400 font-medium mb-1">
-                  Detected Sign (Stable)
+                  Latest Detected Sign
                 </p>
                 <p className="text-3xl font-bold text-green-800 dark:text-green-200">
                   {realtimePrediction.gloss}

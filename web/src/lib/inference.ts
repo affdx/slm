@@ -328,9 +328,10 @@ export async function runInference(
     NUM_FEATURES,
   ]);
 
-  // Run inference
+  // Run inference - use the actual input name from the model
   const startTime = performance.now();
-  const results = await session.run({ input: inputTensor });
+  const inputName = session.inputNames[0] || "input";
+  const results = await session.run({ [inputName]: inputTensor });
   const inferenceTime = performance.now() - startTime;
 
   // Get output logits - handle both 'output' and 'logits' naming
