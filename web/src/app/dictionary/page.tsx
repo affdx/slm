@@ -25,7 +25,6 @@ export default function DictionaryPage() {
     loadGlosses();
   }, []);
 
-  // Categorize glosses
   const categories = useMemo(() => {
     const cats: Record<string, string[]> = {
       greetings: ["assalamualaikum", "hi", "apa_khabar", "baik", "baik_2"],
@@ -51,7 +50,6 @@ export default function DictionaryPage() {
       other: [],
     };
 
-    // Find uncategorized glosses
     const categorized = new Set(Object.values(cats).flat());
     glosses.forEach((gloss) => {
       if (!categorized.has(gloss)) {
@@ -65,7 +63,6 @@ export default function DictionaryPage() {
   const filteredGlosses = useMemo(() => {
     let filtered = glosses;
 
-    // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -75,7 +72,6 @@ export default function DictionaryPage() {
       );
     }
 
-    // Filter by category
     if (selectedCategory !== "all") {
       const categoryGlosses = categories[selectedCategory] || [];
       filtered = filtered.filter((gloss) => categoryGlosses.includes(gloss));
@@ -86,10 +82,10 @@ export default function DictionaryPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex flex-col items-center justify-center min-h-[400px]">
+      <div className="min-h-screen pt-24 flex items-center justify-center">
+        <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading dictionary...</p>
+          <p className="text-gray-500">Loading dictionary...</p>
         </div>
       </div>
     );
@@ -97,121 +93,105 @@ export default function DictionaryPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-md mx-auto text-center">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-            <svg
-              className="w-12 h-12 text-red-500 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <p className="text-red-700 dark:text-red-300">{error}</p>
-          </div>
+      <div className="min-h-screen pt-24 container mx-auto px-4">
+        <div className="max-w-md mx-auto text-center p-8 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-800">
+          <p className="text-red-600 dark:text-red-400">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Sign Language Dictionary
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Browse all {glosses.length} Malaysian Sign Language glosses
-        </p>
-      </div>
-
-      {/* Filters */}
-      <div className="max-w-4xl mx-auto mb-8 space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search glosses..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pt-32 pb-20">
+      <div className="container mx-auto px-4">
+        <div className="max-w-3xl mx-auto text-center mb-16">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            Sign Language Dictionary
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            Explore our collection of {glosses.length} supported signs and gestures.
+          </p>
         </div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              selectedCategory === "all"
-                ? "bg-primary-600 text-white"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-            }`}
-          >
-            All ({glosses.length})
-          </button>
-          {Object.entries(categories).map(([category, items]) => {
-            if (items.length === 0) return null;
-            return (
+        <div className="sticky top-24 z-30 bg-gray-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 mb-8 -mx-4 px-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="relative max-w-2xl mx-auto">
+              <svg
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search for a sign..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-white dark:bg-gray-800 shadow-lg shadow-gray-200/50 dark:shadow-none ring-1 ring-gray-200 dark:ring-gray-700 focus:ring-2 focus:ring-primary-500 transition-all text-lg"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2">
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors capitalize ${
-                  selectedCategory === category
-                    ? "bg-primary-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                onClick={() => setSelectedCategory("all")}
+                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                  selectedCategory === "all"
+                    ? "bg-primary-600 text-white shadow-lg shadow-primary-500/25"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
-                {category} ({items.length})
+                All Signs
               </button>
-            );
-          })}
+              {Object.entries(categories).map(([category, items]) => {
+                if (items.length === 0) return null;
+                return (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 capitalize ${
+                      selectedCategory === category
+                        ? "bg-primary-600 text-white shadow-lg shadow-primary-500/25"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Glosses Grid */}
-      <div className="max-w-6xl mx-auto">
-        {filteredGlosses.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">No glosses found matching your search.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredGlosses.map((gloss, index) => (
-              <div
-                key={gloss}
-                className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-primary-500 hover:shadow-md transition-all cursor-default"
-              >
-                <p className="font-medium text-gray-900 dark:text-white text-center">
-                  {formatGlossName(gloss)}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
-                  #{index + 1}
-                </p>
+        <div className="max-w-7xl mx-auto">
+          {filteredGlosses.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-            ))}
-          </div>
-        )}
+              <p className="text-gray-500 dark:text-gray-400 text-lg">No signs found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {filteredGlosses.map((gloss, index) => (
+                <div
+                  key={gloss}
+                  className="group bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-800 hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-lg hover:shadow-primary-500/5 dark:hover:shadow-none transition-all duration-300"
+                >
+                  <div className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-2 font-mono">
+                    #{String(index + 1).padStart(3, '0')}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white text-lg group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {formatGlossName(gloss)}
+                  </h3>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

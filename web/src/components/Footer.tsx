@@ -1,58 +1,37 @@
 import Link from "next/link";
 
 export function Footer() {
+  const currentYear = new Date().getFullYear();
+  
   return (
-    <footer className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+    <footer className="bg-white/50 dark:bg-slate-900/50 border-t border-gray-200 dark:border-gray-800 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Brand */}
-          <div>
-            <Link href="/" className="flex items-center space-x-2 mb-4">
-              <span className="text-2xl font-bold text-primary-600">MSL</span>
-              <span className="text-gray-900 dark:text-white font-medium">Translator</span>
-            </Link>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              AI-powered Malaysian Sign Language translation system, breaking communication
-              barriers for the deaf community.
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">MSL Translator</span>
+            <span className="text-gray-300 dark:text-gray-700 hidden md:inline">|</span>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Breaking communication barriers.
             </p>
           </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/translate"
-                  className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm"
-                >
-                  Start Translating
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dictionary"
-                  className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm"
-                >
-                  Browse Dictionary
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/about"
-                  className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm"
-                >
-                  About the Project
-                </Link>
-              </li>
-            </ul>
+          
+          <div className="flex items-center gap-6">
+            <Link
+              href="/about"
+              className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
+            >
+              About
+            </Link>
+            <Link
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer" 
+              className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
+            >
+              GitHub
+            </Link>
+            <span className="text-sm text-gray-400 dark:text-gray-600">© {currentYear}</span>
           </div>
-        </div>
-
-        <div className="border-t border-gray-200 dark:border-gray-700 mt-8 pt-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            {new Date().getFullYear()} MSL Translator. Built for accessibility.
-          </p>
         </div>
       </div>
     </footer>
