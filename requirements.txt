@@ -3,8 +3,8 @@ torch>=2.0.0
 torchvision>=0.15.0
 torchaudio>=2.0.0
 
-# MediaPipe for landmark extraction
-mediapipe>=0.10.0
+# MediaPipe for landmark extraction (0.10.14 has Holistic API)
+mediapipe==0.10.14
 
 # Computer vision
 opencv-python>=4.8.0

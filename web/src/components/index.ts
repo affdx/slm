@@ -1,6 +1,7 @@
 export { Header } from "./Header";
 export { Footer } from "./Footer";
 export { VideoUpload } from "./VideoUpload";
+export { VideoInferencePlayer } from "./VideoInferencePlayer";
 export { WebcamCapture } from "./WebcamCapture";
 export { RealtimeWebcamCapture } from "./RealtimeWebcamCapture";
 export { TranslationResult } from "./TranslationResult";

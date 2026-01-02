@@ -1,24 +1,16 @@
 /**
- * MediaPipe Tasks Vision landmark extraction for browser.
- *
- * Extracts pose and hand landmarks from video frames using
- * MediaPipe Pose Landmarker + Hand Landmarker.
+ * MediaPipe Holistic landmark extraction for browser.
+ * 
+ * Uses @mediapipe/holistic package which matches the Python baseline's
+ * MediaPipe Holistic API for consistent feature extraction.
  *
  * Feature structure (258 total):
  * - Pose landmarks: 33 x 4 (x, y, z, visibility) = 132 features
  * - Left hand landmarks: 21 x 3 (x, y, z) = 63 features
  * - Right hand landmarks: 21 x 3 (x, y, z) = 63 features
- *
- * Uses dynamic imports to avoid SSR issues.
  */
 
-// Type imports only (no runtime import)
-type PoseLandmarker = import("@mediapipe/tasks-vision").PoseLandmarker;
-type HandLandmarker = import("@mediapipe/tasks-vision").HandLandmarker;
-type PoseLandmarkerResult =
-  import("@mediapipe/tasks-vision").PoseLandmarkerResult;
-type HandLandmarkerResult =
-  import("@mediapipe/tasks-vision").HandLandmarkerResult;
+import { Holistic, Results } from "@mediapipe/holistic";
 
 // Feature dimensions (must match Python training)
 const NUM_POSE_LANDMARKS = 33;
@@ -28,210 +20,102 @@ const HAND_FEATURES = NUM_HAND_LANDMARKS * 3; // x, y, z = 63
 const TOTAL_FEATURES = POSE_FEATURES + HAND_FEATURES * 2; // 132 + 63 + 63 = 258
 const NUM_FRAMES = 30;
 
-// Singleton instances
-let poseLandmarker: PoseLandmarker | null = null;
-let handLandmarker: HandLandmarker | null = null;
+// Singleton Holistic instance
+let holistic: Holistic | null = null;
 let initPromise: Promise<void> | null = null;
-let currentDelegate: "GPU" | "CPU" = "GPU";
-
-// LocalStorage key for delegate preference
-const DELEGATE_STORAGE_KEY = "mediapipe-delegate";
+let lastResults: Results | null = null;
 
 /**
- * Get saved delegate preference from localStorage
+ * Initialize MediaPipe Holistic
  */
-function getSavedDelegate(): "GPU" | "CPU" {
-  if (typeof localStorage === "undefined") return "GPU";
-  const saved = localStorage.getItem(DELEGATE_STORAGE_KEY);
-  return saved === "CPU" ? "CPU" : "GPU";
-}
-
-/**
- * Save delegate preference to localStorage
- */
-function saveDelegate(delegate: "GPU" | "CPU"): void {
-  if (typeof localStorage === "undefined") return;
-  localStorage.setItem(DELEGATE_STORAGE_KEY, delegate);
-}
-
-/**
- * Initialize MediaPipe landmarkers with specified delegate
- */
-async function initializeLandmarkers(delegate?: "GPU" | "CPU"): Promise<void> {
-  const targetDelegate = delegate ?? getSavedDelegate();
-  
-  // If already initialized with same delegate, skip
-  if (poseLandmarker && handLandmarker && currentDelegate === targetDelegate) {
-    return;
-  }
-
-  // If switching delegates, close existing landmarkers
-  if (poseLandmarker || handLandmarker) {
-    console.log(`[MediaPipe] Switching delegate from ${currentDelegate} to ${targetDelegate}`);
-    if (poseLandmarker) {
-      poseLandmarker.close();
-      poseLandmarker = null;
-    }
-    if (handLandmarker) {
-      handLandmarker.close();
-      handLandmarker = null;
-    }
-    initPromise = null;
-  }
-
-  console.log(`[MediaPipe] Initializing landmarkers with ${targetDelegate} delegate...`);
+async function initializeHolistic(): Promise<void> {
+  console.log("[MediaPipe] Initializing Holistic...");
   const startTime = performance.now();
 
-  // Dynamic import
-  const { PoseLandmarker, HandLandmarker, FilesetResolver } = await import(
-    "@mediapipe/tasks-vision"
-  );
-
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-  );
-
-  // Initialize Pose Landmarker
-  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-      delegate: targetDelegate,
+  holistic = new Holistic({
+    locateFile: (file) => {
+      return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.5.1675471629/${file}`;
     },
-    runningMode: "VIDEO",
-    numPoses: 1,
-    minPoseDetectionConfidence: 0.5,
-    minPosePresenceConfidence: 0.5,
+  });
+
+  holistic.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5,
   });
 
-  // Initialize Hand Landmarker
-  handLandmarker = await HandLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-      delegate: targetDelegate,
-    },
-    runningMode: "VIDEO",
-    numHands: 2,
-    minHandDetectionConfidence: 0.5,
-    minHandPresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
+  // Set up results callback
+  holistic.onResults((results) => {
+    lastResults = results;
   });
 
-  currentDelegate = targetDelegate;
-  saveDelegate(targetDelegate);
+  // Initialize by sending a dummy frame
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 480;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await holistic.send({ image: canvas });
+  }
 
   const loadTime = performance.now() - startTime;
-  console.log(
-    `[MediaPipe] Landmarkers initialized with ${targetDelegate} delegate in ${loadTime.toFixed(0)}ms`
-  );
+  console.log(`[MediaPipe] Holistic initialized in ${loadTime.toFixed(0)}ms`);
 }
 
 /**
- * Ensure landmarkers are initialized (singleton pattern)
+ * Ensure Holistic is initialized (singleton pattern)
  */
 export async function ensureLandmarkersReady(): Promise<void> {
   if (!initPromise) {
-    initPromise = initializeLandmarkers();
+    initPromise = initializeHolistic();
   }
   await initPromise;
 }
 
 /**
- * Extract landmarks from a single frame
- * 
- * IMPORTANT: MediaPipe HandLandmarker returns handedness from the camera's perspective,
- * which is MIRRORED from the person's perspective.
- * - "Left" from camera = person's RIGHT hand
- * - "Right" from camera = person's LEFT hand
- * 
- * However, MediaPipe Holistic (used in Python training) returns from person's perspective.
- * So we need to NOT swap - use the labels directly as the Python code expects.
+ * Extract 258 features from Holistic results (matching Python baseline exactly)
  */
-function extractFrameLandmarks(
-  poseResult: PoseLandmarkerResult,
-  handResult: HandLandmarkerResult
-): Float32Array {
+function extractKeypoints258(results: Results): Float32Array {
   const features = new Float32Array(TOTAL_FEATURES);
 
-  // Extract pose landmarks (33 x 4 = 132 features)
-  // Use worldLandmarks if available for visibility, otherwise use landmarks
-  if (poseResult.landmarks && poseResult.landmarks.length > 0) {
-    const poseLandmarks = poseResult.landmarks[0];
-    // worldLandmarks have visibility property
-    const worldLandmarks = poseResult.worldLandmarks?.[0];
-    
+  // Pose landmarks (33 x 4 = 132 features)
+  if (results.poseLandmarks) {
     for (let i = 0; i < NUM_POSE_LANDMARKS; i++) {
-      const landmark = poseLandmarks[i];
-      if (landmark) {
-        features[i * 4] = landmark.x;
-        features[i * 4 + 1] = landmark.y;
-        features[i * 4 + 2] = landmark.z;
-        // Use visibility from worldLandmarks if available, otherwise default to 1.0
-        // Note: Tasks Vision API might have visibility in worldLandmarks
-        const worldLm = worldLandmarks?.[i];
-        features[i * 4 + 3] = (worldLm as { visibility?: number })?.visibility ?? 1.0;
+      const lm = results.poseLandmarks[i];
+      if (lm) {
+        features[i * 4] = lm.x;
+        features[i * 4 + 1] = lm.y;
+        features[i * 4 + 2] = lm.z;
+        features[i * 4 + 3] = lm.visibility ?? 1.0;
       }
     }
   }
 
-  // Extract hand landmarks
-  // 
-  // IMPORTANT: MediaPipe HandLandmarker returns handedness from the CAMERA's perspective,
-  // which is MIRRORED from the person's perspective:
-  // - "Left" label from HandLandmarker = person's RIGHT hand
-  // - "Right" label from HandLandmarker = person's LEFT hand
-  // 
-  // MediaPipe Holistic (used in baseline training) returns from the PERSON's perspective
-  // where left_hand_landmarks = person's left hand.
-  // 
-  // To match the baseline training data, we MUST SWAP the hand assignments:
-  // - HandLandmarker "Left" -> assign to RIGHT hand slot (person's right)
-  // - HandLandmarker "Right" -> assign to LEFT hand slot (person's left)
-  
-  let leftHandIdx = -1;
-  let rightHandIdx = -1;
-
-  if (handResult.handedness) {
-    for (let i = 0; i < handResult.handedness.length; i++) {
-      const handedness = handResult.handedness[i];
-      if (handedness && handedness.length > 0) {
-        const label = handedness[0].categoryName;
-        // SWAP: HandLandmarker labels are from camera perspective (mirrored)
-        if (label === "Left") {
-          rightHandIdx = i;  // Camera's "Left" = Person's RIGHT hand
-        } else if (label === "Right") {
-          leftHandIdx = i;   // Camera's "Right" = Person's LEFT hand
-        }
-      }
-    }
-  }
-
-  // Left hand landmarks (21 x 3 = 63 features) - person's left hand
-  if (leftHandIdx >= 0 && handResult.landmarks[leftHandIdx]) {
-    const leftHand = handResult.landmarks[leftHandIdx];
+  // Left hand landmarks (21 x 3 = 63 features)
+  if (results.leftHandLandmarks) {
     for (let i = 0; i < NUM_HAND_LANDMARKS; i++) {
-      const landmark = leftHand[i];
-      if (landmark) {
+      const lm = results.leftHandLandmarks[i];
+      if (lm) {
         const offset = POSE_FEATURES + i * 3;
-        features[offset] = landmark.x;
-        features[offset + 1] = landmark.y;
-        features[offset + 2] = landmark.z;
+        features[offset] = lm.x;
+        features[offset + 1] = lm.y;
+        features[offset + 2] = lm.z;
       }
     }
   }
 
-  // Right hand landmarks (21 x 3 = 63 features) - person's right hand
-  if (rightHandIdx >= 0 && handResult.landmarks[rightHandIdx]) {
-    const rightHand = handResult.landmarks[rightHandIdx];
+  // Right hand landmarks (21 x 3 = 63 features)
+  if (results.rightHandLandmarks) {
     for (let i = 0; i < NUM_HAND_LANDMARKS; i++) {
-      const landmark = rightHand[i];
-      if (landmark) {
+      const lm = results.rightHandLandmarks[i];
+      if (lm) {
         const offset = POSE_FEATURES + HAND_FEATURES + i * 3;
-        features[offset] = landmark.x;
-        features[offset + 1] = landmark.y;
-        features[offset + 2] = landmark.z;
+        features[offset] = lm.x;
+        features[offset + 1] = lm.y;
+        features[offset + 2] = lm.z;
       }
     }
   }
@@ -240,10 +124,40 @@ function extractFrameLandmarks(
 }
 
 /**
- * Extract landmarks from a video element
+ * Process a single frame with Holistic
+ */
+async function processFrame(canvas: HTMLCanvasElement): Promise<Float32Array> {
+  if (!holistic) {
+    throw new Error("Holistic not initialized");
+  }
+
+  lastResults = null;
+  await holistic.send({ image: canvas });
+
+  // Wait for results (callback based)
+  let attempts = 0;
+  while (!lastResults && attempts < 100) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    attempts++;
+  }
+
+  if (!lastResults) {
+    console.warn("[MediaPipe] No results after timeout, returning zeros");
+    return new Float32Array(TOTAL_FEATURES);
+  }
+
+  return extractKeypoints258(lastResults);
+}
+
+/**
+ * Extract landmarks from a video element using SLIDING WINDOW approach.
+ * 
+ * This matches the baseline training approach:
+ * - Process ALL frames in the video sequentially
+ * - Use the LAST N frames for prediction (sliding window)
  *
  * @param video - Video element to process
- * @param numFrames - Number of frames to extract (default 30)
+ * @param numFrames - Number of frames to use for prediction (default 30)
  * @returns Float32Array of shape [numFrames * 258]
  */
 export async function extractLandmarksFromVideo(
@@ -252,8 +166,8 @@ export async function extractLandmarksFromVideo(
 ): Promise<Float32Array> {
   await ensureLandmarkersReady();
 
-  if (!poseLandmarker || !handLandmarker) {
-    throw new Error("Landmarkers not initialized");
+  if (!holistic) {
+    throw new Error("Holistic not initialized");
   }
 
   const duration = video.duration;
@@ -261,16 +175,13 @@ export async function extractLandmarksFromVideo(
     throw new Error("Invalid video duration");
   }
 
+  const estimatedFps = 30;
+  const estimatedTotalFrames = Math.ceil(duration * estimatedFps);
+
   console.log(
-    `[MediaPipe] Extracting ${numFrames} frames from ${duration.toFixed(2)}s video`
+    `[MediaPipe] Processing video: ${duration.toFixed(2)}s, ~${estimatedTotalFrames} frames (sliding window, last ${numFrames})`
   );
   const startTime = performance.now();
-
-  // Calculate frame times to sample (same as Python: np.linspace)
-  const frameTimes: number[] = [];
-  for (let i = 0; i < numFrames; i++) {
-    frameTimes.push((i / (numFrames - 1)) * duration);
-  }
 
   // Create canvas for frame extraction
   const canvas = document.createElement("canvas");
@@ -281,13 +192,13 @@ export async function extractLandmarksFromVideo(
     throw new Error("Failed to create canvas context");
   }
 
-  // Extract landmarks for each frame
-  const allLandmarks = new Float32Array(numFrames * TOTAL_FEATURES);
-  let timestampMs = 0;
+  // Process ALL frames and store landmarks
+  const allFrameLandmarks: Float32Array[] = [];
+  const frameInterval = 1 / estimatedFps;
 
-  for (let i = 0; i < numFrames; i++) {
+  for (let time = 0; time < duration; time += frameInterval) {
     // Seek to frame time
-    video.currentTime = frameTimes[i];
+    video.currentTime = time;
     await new Promise<void>((resolve) => {
       const onSeeked = () => {
         video.removeEventListener("seeked", onSeeked);
@@ -299,22 +210,129 @@ export async function extractLandmarksFromVideo(
     // Draw frame to canvas
     ctx.drawImage(video, 0, 0);
 
-    // Process with MediaPipe - use incrementing timestamp for VIDEO mode
-    timestampMs = performance.now();
-    const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
-    const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
+    // Process with Holistic
+    const landmarks = await processFrame(canvas);
+    allFrameLandmarks.push(landmarks);
+  }
 
-    // Extract features
-    const frameLandmarks = extractFrameLandmarks(poseResult, handResult);
-    allLandmarks.set(frameLandmarks, i * TOTAL_FEATURES);
+  console.log(`[MediaPipe] Processed ${allFrameLandmarks.length} total frames`);
+
+  // Use LAST N frames (sliding window approach matching baseline)
+  const result = new Float32Array(numFrames * TOTAL_FEATURES);
+
+  if (allFrameLandmarks.length >= numFrames) {
+    const startIdx = allFrameLandmarks.length - numFrames;
+    for (let i = 0; i < numFrames; i++) {
+      result.set(allFrameLandmarks[startIdx + i], i * TOTAL_FEATURES);
+    }
+  } else {
+    // Video too short - pad with zeros at beginning
+    const padding = numFrames - allFrameLandmarks.length;
+    for (let i = 0; i < allFrameLandmarks.length; i++) {
+      result.set(allFrameLandmarks[i], (padding + i) * TOTAL_FEATURES);
+    }
   }
 
   const extractionTime = performance.now() - startTime;
   console.log(
-    `[MediaPipe] Landmark extraction completed in ${extractionTime.toFixed(0)}ms`
+    `[MediaPipe] Extraction completed in ${extractionTime.toFixed(0)}ms`
   );
 
-  return allLandmarks;
+  return result;
+}
+
+/**
+ * Extract ALL frame landmarks from a video (for sliding window inference).
+ * 
+ * Returns an array of landmarks for each frame, which can be used to
+ * run inference on multiple sliding windows and pick the best result.
+ *
+ * @param video - Video element to process
+ * @returns Array of Float32Array, one per frame (each with 258 features)
+ */
+export async function extractAllFrameLandmarks(
+  video: HTMLVideoElement
+): Promise<Float32Array[]> {
+  await ensureLandmarkersReady();
+
+  if (!holistic) {
+    throw new Error("Holistic not initialized");
+  }
+
+  const duration = video.duration;
+  if (!duration || duration === 0) {
+    throw new Error("Invalid video duration");
+  }
+
+  const estimatedFps = 30;
+  console.log(
+    `[MediaPipe] Extracting ALL frame landmarks from video: ${duration.toFixed(2)}s`
+  );
+  const startTime = performance.now();
+
+  // Create canvas for frame extraction
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Failed to create canvas context");
+  }
+
+  // Process ALL frames and store landmarks
+  const allFrameLandmarks: Float32Array[] = [];
+  const frameInterval = 1 / estimatedFps;
+
+  for (let time = 0; time < duration; time += frameInterval) {
+    // Seek to frame time
+    video.currentTime = time;
+    await new Promise<void>((resolve) => {
+      const onSeeked = () => {
+        video.removeEventListener("seeked", onSeeked);
+        resolve();
+      };
+      video.addEventListener("seeked", onSeeked);
+    });
+
+    // Draw frame to canvas
+    ctx.drawImage(video, 0, 0);
+
+    // Process with Holistic
+    const landmarks = await processFrame(canvas);
+    allFrameLandmarks.push(landmarks);
+  }
+
+  const extractionTime = performance.now() - startTime;
+  console.log(
+    `[MediaPipe] Extracted ${allFrameLandmarks.length} frames in ${extractionTime.toFixed(0)}ms`
+  );
+
+  return allFrameLandmarks;
+}
+
+/**
+ * Extract ALL frame landmarks from a video blob
+ */
+export async function extractAllFrameLandmarksFromBlob(
+  blob: Blob
+): Promise<Float32Array[]> {
+  const video = document.createElement("video");
+  video.playsInline = true;
+  video.muted = true;
+
+  const url = URL.createObjectURL(blob);
+  video.src = url;
+
+  await new Promise<void>((resolve, reject) => {
+    video.onloadedmetadata = () => resolve();
+    video.onerror = () => reject(new Error("Failed to load video"));
+  });
+
+  try {
+    return await extractAllFrameLandmarks(video);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /**
@@ -324,16 +342,13 @@ export async function extractLandmarksFromBlob(
   blob: Blob,
   numFrames: number = NUM_FRAMES
 ): Promise<Float32Array> {
-  // Create video element
   const video = document.createElement("video");
   video.playsInline = true;
   video.muted = true;
 
-  // Load video from blob
   const url = URL.createObjectURL(blob);
   video.src = url;
 
-  // Wait for video to load metadata
   await new Promise<void>((resolve, reject) => {
     video.onloadedmetadata = () => resolve();
     video.onerror = () => reject(new Error("Failed to load video"));
@@ -347,54 +362,28 @@ export async function extractLandmarksFromBlob(
 }
 
 /**
- * Process a single image/frame and return landmarks
+ * Extract landmarks from a single canvas frame (for real-time processing)
  */
-export async function extractLandmarksFromImage(
-  image: HTMLImageElement | HTMLCanvasElement
+export async function extractLandmarksFromFrame(
+  canvas: HTMLCanvasElement
 ): Promise<Float32Array> {
   await ensureLandmarkersReady();
-
-  if (!poseLandmarker || !handLandmarker) {
-    throw new Error("Landmarkers not initialized");
-  }
-
-  // For single image, use IMAGE mode results
-  // We need to temporarily switch to IMAGE mode
-  const canvas = document.createElement("canvas");
-  if (image instanceof HTMLImageElement) {
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-  } else {
-    canvas.width = image.width;
-    canvas.height = image.height;
-  }
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Failed to create canvas context");
-  }
-  ctx.drawImage(image, 0, 0);
-
-  const timestampMs = performance.now();
-  const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
-  const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
-
-  return extractFrameLandmarks(poseResult, handResult);
+  return processFrame(canvas);
 }
 
 /**
- * Check if landmarkers are ready
+ * Check if Holistic is ready
  */
 export function areLandmarkersReady(): boolean {
-  return poseLandmarker !== null && handLandmarker !== null;
+  return holistic !== null;
 }
 
 /**
- * Preload landmarkers
+ * Preload Holistic
  */
 export async function preloadLandmarkers(): Promise<void> {
   await ensureLandmarkersReady();
-  console.log("[MediaPipe] Landmarkers preloaded");
+  console.log("[MediaPipe] Holistic preloaded");
 }
 
 /**
@@ -410,53 +399,17 @@ export function getFeatureDimensions() {
   };
 }
 
-/**
- * Get current delegate being used
- */
+// Legacy exports for compatibility
 export function getCurrentDelegate(): "GPU" | "CPU" {
-  return currentDelegate;
+  return "CPU"; // Holistic doesn't have GPU/CPU toggle
 }
 
-/**
- * Set delegate and reinitialize landmarkers
- * Call this to switch between GPU and CPU processing
- */
-export async function setDelegate(delegate: "GPU" | "CPU"): Promise<void> {
-  initPromise = initializeLandmarkers(delegate);
-  await initPromise;
+export async function setDelegate(_delegate: "GPU" | "CPU"): Promise<void> {
+  // No-op for Holistic
 }
 
-/**
- * Toggle between GPU and CPU delegate
- */
 export async function toggleDelegate(): Promise<"GPU" | "CPU"> {
-  const newDelegate = currentDelegate === "GPU" ? "CPU" : "GPU";
-  await setDelegate(newDelegate);
-  return newDelegate;
-}
-
-/**
- * Extract landmarks from a single canvas frame (for real-time processing)
- * This is optimized for continuous webcam processing.
- * 
- * @param canvas - Canvas element with current frame drawn
- * @returns Float32Array of 258 features for single frame
- */
-export async function extractLandmarksFromFrame(
-  canvas: HTMLCanvasElement
-): Promise<Float32Array> {
-  await ensureLandmarkersReady();
-
-  if (!poseLandmarker || !handLandmarker) {
-    throw new Error("Landmarkers not initialized");
-  }
-
-  // Use monotonically increasing timestamp for VIDEO mode
-  const timestampMs = performance.now();
-  const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
-  const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
-
-  return extractFrameLandmarks(poseResult, handResult);
+  return "CPU";
 }
 
 /**
@@ -486,101 +439,86 @@ export interface LandmarkExtractionResult {
   drawingData: DrawingData;
 }
 
-// Pose connections for drawing skeleton lines
+// Pose connections for drawing
 export const POSE_CONNECTIONS: [number, number][] = [
-  // Face
   [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
-  // Torso
   [9, 10], [11, 12], [11, 23], [12, 24], [23, 24],
-  // Left arm
   [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
-  // Right arm
   [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
-  // Left leg
   [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
-  // Right leg
   [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
 ];
 
-// Hand connections for drawing skeleton lines
+// Hand connections for drawing
 export const HAND_CONNECTIONS: [number, number][] = [
-  // Thumb
   [0, 1], [1, 2], [2, 3], [3, 4],
-  // Index finger
   [0, 5], [5, 6], [6, 7], [7, 8],
-  // Middle finger
   [0, 9], [9, 10], [10, 11], [11, 12],
-  // Ring finger
   [0, 13], [13, 14], [14, 15], [15, 16],
-  // Pinky
   [0, 17], [17, 18], [18, 19], [19, 20],
-  // Palm
   [5, 9], [9, 13], [13, 17],
 ];
 
 /**
- * Extract landmarks from a single canvas frame with drawing data
- * Returns both the feature array for inference AND raw landmark positions for visualization
- * 
- * @param canvas - Canvas element with current frame drawn
- * @returns Object with features array and drawing data
+ * Extract landmarks with drawing data (for VideoInferencePlayer)
  */
 export async function extractLandmarksWithDrawingData(
   canvas: HTMLCanvasElement
 ): Promise<LandmarkExtractionResult> {
   await ensureLandmarkersReady();
 
-  if (!poseLandmarker || !handLandmarker) {
-    throw new Error("Landmarkers not initialized");
+  if (!holistic) {
+    throw new Error("Holistic not initialized");
   }
 
-  // Use monotonically increasing timestamp for VIDEO mode
-  const timestampMs = performance.now();
-  const poseResult = poseLandmarker.detectForVideo(canvas, timestampMs);
-  const handResult = handLandmarker.detectForVideo(canvas, timestampMs);
+  lastResults = null;
+  await holistic.send({ image: canvas });
 
-  // Extract features for inference
-  const features = extractFrameLandmarks(poseResult, handResult);
+  // Wait for results
+  let attempts = 0;
+  while (!lastResults && attempts < 100) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    attempts++;
+  }
 
-  // Extract drawing data
+  // Use type assertion to help TypeScript - Results type from @mediapipe/holistic
+  // declares properties as required but they may actually be undefined at runtime
+  const currentResults = lastResults as Results | null;
+  const features = currentResults ? extractKeypoints258(currentResults) : new Float32Array(TOTAL_FEATURES);
+
   const drawingData: DrawingData = {
     pose: null,
     leftHand: null,
     rightHand: null,
   };
 
-  // Pose landmarks
-  if (poseResult.landmarks && poseResult.landmarks.length > 0) {
-    const worldLandmarks = poseResult.worldLandmarks?.[0];
-    drawingData.pose = poseResult.landmarks[0].map((lm, i) => ({
-      x: lm.x,
-      y: lm.y,
-      z: lm.z,
-      visibility: (worldLandmarks?.[i] as { visibility?: number })?.visibility,
-    }));
-  }
+  if (currentResults) {
+    // Access properties with optional chaining since they may be undefined at runtime
+    const pose = currentResults.poseLandmarks;
+    const leftHand = currentResults.leftHandLandmarks;
+    const rightHand = currentResults.rightHandLandmarks;
 
-  // Hand landmarks - determine left/right based on handedness
-  // SWAP labels: HandLandmarker returns from camera perspective (mirrored)
-  // For drawing, we keep the visual position but swap the semantic label
-  if (handResult.landmarks && handResult.handedness) {
-    for (let i = 0; i < handResult.landmarks.length; i++) {
-      const handedness = handResult.handedness[i];
-      if (handedness && handedness.length > 0) {
-        const label = handedness[0].categoryName;
-        const landmarks = handResult.landmarks[i].map((lm) => ({
-          x: lm.x,
-          y: lm.y,
-          z: lm.z,
-        }));
-
-        // SWAP: Camera's "Left" = Person's RIGHT, Camera's "Right" = Person's LEFT
-        if (label === "Left") {
-          drawingData.rightHand = landmarks;  // Person's right hand
-        } else if (label === "Right") {
-          drawingData.leftHand = landmarks;   // Person's left hand
-        }
-      }
+    if (pose) {
+      drawingData.pose = pose.map((lm) => ({
+        x: lm.x,
+        y: lm.y,
+        z: lm.z,
+        visibility: lm.visibility,
+      }));
+    }
+    if (leftHand) {
+      drawingData.leftHand = leftHand.map((lm) => ({
+        x: lm.x,
+        y: lm.y,
+        z: lm.z,
+      }));
+    }
+    if (rightHand) {
+      drawingData.rightHand = rightHand.map((lm) => ({
+        x: lm.x,
+        y: lm.y,
+        z: lm.z,
+      }));
     }
   }
 
@@ -588,13 +526,7 @@ export async function extractLandmarksWithDrawingData(
 }
 
 /**
- * Draw landmarks on a canvas
- * 
- * @param ctx - Canvas 2D context
- * @param drawingData - Landmark drawing data
- * @param width - Canvas width
- * @param height - Canvas height
- * @param options - Drawing options
+ * Draw landmarks on canvas
  */
 export function drawLandmarks(
   ctx: CanvasRenderingContext2D,
@@ -621,7 +553,6 @@ export function drawLandmarks(
     pointRadius = 4,
   } = options;
 
-  // Helper to draw connections
   const drawConnections = (
     landmarks: LandmarkPoint[],
     connections: [number, number][],
@@ -640,10 +571,8 @@ export function drawLandmarks(
     }
   };
 
-  // Helper to draw points
   const drawPoints = (landmarks: LandmarkPoint[], color: string) => {
     ctx.fillStyle = color;
-
     for (const lm of landmarks) {
       ctx.beginPath();
       ctx.arc(lm.x * width, lm.y * height, pointRadius, 0, 2 * Math.PI);
@@ -651,13 +580,11 @@ export function drawLandmarks(
     }
   };
 
-  // Draw pose
   if (showPose && drawingData.pose) {
     drawConnections(drawingData.pose, POSE_CONNECTIONS, poseColor);
     drawPoints(drawingData.pose, poseColor);
   }
 
-  // Draw hands
   if (showHands) {
     if (drawingData.leftHand) {
       drawConnections(drawingData.leftHand, HAND_CONNECTIONS, leftHandColor);

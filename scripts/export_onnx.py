@@ -2,7 +2,7 @@
 """Export PyTorch model to ONNX format for browser inference.
 
 This script converts the trained sign language model to ONNX format,
-which can be run in the browser using ONNX Runtime Web with WebGL backend.
+which can be run in the browser using ONNX Runtime Web.
 
 Usage:
     python scripts/export_onnx.py
@@ -14,40 +14,64 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
-from src.models.lstm import BiLSTMWithAttention, LSTMClassifier, LSTMWithPooling
+# Add project root to path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Model registry
-MODEL_REGISTRY = {
-    "lstm": LSTMClassifier,
-    "bilstm_attention": BiLSTMWithAttention,
-    "lstm_pooling": LSTMWithPooling,
-}
+from src.models.lstm import BetterLSTM
 
 
-def load_model(checkpoint_path: Path, device: torch.device) -> tuple[torch.nn.Module, dict]:
-    """Load model from checkpoint."""
+def load_model(
+    checkpoint_path: Path,
+    device: torch.device,
+) -> tuple[torch.nn.Module, dict]:
+    """Load BetterLSTM model from checkpoint or weights file."""
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-
-    config = checkpoint.get("model_config", {})
-    model_type = config.pop("model_type", "bilstm_attention")
-    config.pop("num_parameters", None)
-
-    model_cls = MODEL_REGISTRY.get(model_type, BiLSTMWithAttention)
-    model = model_cls(**config)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    state = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    
+    # Check if this is a full checkpoint or just weights
+    if "model_state_dict" in state:
+        # Full checkpoint
+        config = state.get("model_config", {})
+        config.pop("num_parameters", None)
+        model = BetterLSTM(**config)
+        model.load_state_dict(state["model_state_dict"])
+    else:
+        # Just weights (state_dict)
+        model = BetterLSTM()
+        model.load_state_dict(state)
+        config = model.get_config()
+    
     model = model.to(device)
     model.eval()
-
-    config["model_type"] = model_type
-
+    
     return model, config
+
+
+def export_norm_stats_to_json(norm_stats_path: Path, output_path: Path) -> None:
+    """Export normalization stats from .npz to .json for browser use."""
+    norm = np.load(norm_stats_path)
+    mean = norm["mean"].flatten().tolist()
+    std = norm["std"].flatten().tolist()
+    
+    stats = {
+        "mean": mean,
+        "std": std,
+        "shape": [1, 1, len(mean)],
+    }
+    
+    with open(output_path, "w") as f:
+        json.dump(stats, f)
+    
+    print(f"Norm stats exported to: {output_path}")
 
 
 def export_to_onnx(
@@ -60,7 +84,6 @@ def export_to_onnx(
     """Export PyTorch model to ONNX format."""
     dummy_input = torch.randn(1, num_frames, num_features)
 
-    # Use legacy exporter for better opset control
     torch.onnx.export(
         model,
         (dummy_input,),
@@ -74,7 +97,6 @@ def export_to_onnx(
             "landmarks": {0: "batch_size"},
             "logits": {0: "batch_size"},
         },
-        dynamo=False,  # Use legacy exporter
     )
 
     print(f"Model exported to: {output_path}")
@@ -83,7 +105,7 @@ def export_to_onnx(
 def verify_onnx_model(onnx_path: Path) -> bool:
     """Verify the exported ONNX model."""
     try:
-        import onnx  # type: ignore[import-not-found]
+        import onnx
 
         model = onnx.load(str(onnx_path))
         onnx.checker.check_model(model)
@@ -111,8 +133,7 @@ def verify_onnx_model(onnx_path: Path) -> bool:
 def test_onnx_inference(onnx_path: Path, pytorch_model: torch.nn.Module) -> bool:
     """Test ONNX inference matches PyTorch."""
     try:
-        import numpy as np
-        import onnxruntime as ort  # type: ignore[import-not-found]
+        import onnxruntime as ort
 
         test_input = np.random.randn(1, 30, 258).astype(np.float32)
 
@@ -147,7 +168,13 @@ def main() -> None:
         "--checkpoint",
         type=str,
         default="models/best.pt",
-        help="Path to model checkpoint",
+        help="Path to model checkpoint or weights file",
+    )
+    parser.add_argument(
+        "--norm-stats",
+        type=str,
+        default="models/norm_stats.npz",
+        help="Path to normalization stats (.npz file)",
     )
     parser.add_argument(
         "--output",
@@ -171,17 +198,18 @@ def main() -> None:
     args = parser.parse_args()
 
     checkpoint_path = Path(args.checkpoint)
+    norm_stats_path = Path(args.norm_stats)
     output_path = Path(args.output)
 
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    device = torch.device("cpu")
+
     # Load model
     print(f"Loading model from {checkpoint_path}")
-    device = torch.device("cpu")
     model, config = load_model(checkpoint_path, device)
-
-    print(f"Model type: {config.get('model_type', 'unknown')}")
+    print(f"Model config: {config}")
 
     # Export to ONNX
     print(f"\nExporting to ONNX: {output_path}")
@@ -191,6 +219,11 @@ def main() -> None:
         num_frames=args.num_frames,
         opset_version=args.opset_version,
     )
+
+    # Export norm stats if available
+    if norm_stats_path.exists():
+        norm_output = output_path.parent / f"{output_path.stem}_norm_stats.json"
+        export_norm_stats_to_json(norm_stats_path, norm_output)
 
     # Verify and test
     verify_onnx_model(output_path)

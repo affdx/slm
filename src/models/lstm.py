@@ -1,7 +1,7 @@
 """LSTM-based models for sign language classification.
 
-This module provides LSTM and Bidirectional LSTM architectures
-for sequence classification.
+This module provides the BetterLSTM architecture - an optimized
+Bidirectional LSTM with scalar attention for sequence classification.
 """
 
 from __future__ import annotations
@@ -13,32 +13,76 @@ from typing import Any
 from .base import BaseModel, init_weights
 
 
-class LSTMClassifier(BaseModel):
-    """Standard LSTM classifier for sign language recognition.
+class AttentionPooling(nn.Module):
+    """Scalar attention pooling for sequence aggregation.
 
-    This is the baseline model architecture using stacked LSTM layers
-    followed by fully connected layers for classification.
+    This attention mechanism learns a single weight per timestep,
+    effectively learning "which frames matter" for classification.
+    Simpler and more interpretable than multi-head attention.
+    """
+
+    def __init__(self, hidden_dim: int):
+        """Initialize attention pooling.
+
+        Args:
+            hidden_dim: Dimension of hidden states to attend over.
+        """
+        super().__init__()
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+        self.v = nn.Linear(hidden_dim, 1, bias=False)
+
+    def forward(self, h: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply attention pooling.
+
+        Args:
+            h: Hidden states of shape (batch, seq_len, hidden_dim).
+
+        Returns:
+            Tuple of (context_vector, attention_weights).
+            - context_vector: Shape (batch, hidden_dim)
+            - attention_weights: Shape (batch, seq_len)
+        """
+        # Project and compute attention scores
+        a = torch.tanh(self.proj(h))  # (B, T, H)
+        score = self.v(a).squeeze(-1)  # (B, T)
+
+        # Softmax to get attention weights
+        w = torch.softmax(score, dim=1)  # (B, T)
+
+        # Weighted sum of hidden states
+        out = torch.sum(h * w.unsqueeze(-1), dim=1)  # (B, H)
+
+        return out, w
+
+
+class BetterLSTM(BaseModel):
+    """Optimized BiLSTM with scalar attention for sign language recognition.
+
+    This architecture achieves 93.86% accuracy with only 969K parameters.
+    Key features:
+    - Bidirectional LSTM with LayerNorm
+    - Scalar attention pooling (simpler than multi-head)
+    - GELU activation in MLP head
+    - Smaller hidden size (128) for better generalization
     """
 
     def __init__(
         self,
         input_size: int = 258,
         num_classes: int = 90,
-        hidden_size: int = 256,
-        num_layers: int = 3,
-        dropout: float = 0.3,
-        bidirectional: bool = False,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        dropout: float = 0.35,
         **kwargs: Any,
     ):
-        """Initialize the LSTM classifier.
+        """Initialize the BetterLSTM model.
 
         Args:
-            input_size: Number of input features per frame.
-            num_classes: Number of output classes.
-            hidden_size: LSTM hidden state size.
-            num_layers: Number of stacked LSTM layers.
-            dropout: Dropout probability.
-            bidirectional: Whether to use bidirectional LSTM.
+            input_size: Number of input features per frame (default: 258).
+            num_classes: Number of output classes (default: 90).
+            hidden_size: LSTM hidden state size (default: 128).
+            num_layers: Number of stacked LSTM layers (default: 2).
+            dropout: Dropout probability (default: 0.35).
             **kwargs: Additional arguments.
         """
         super().__init__(input_size=input_size, num_classes=num_classes, **kwargs)
@@ -46,30 +90,33 @@ class LSTMClassifier(BaseModel):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.dropout_rate = dropout
-        self.bidirectional = bidirectional
 
-        # LSTM layers
+        # Bidirectional LSTM
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0,
-            bidirectional=bidirectional,
+            dropout=dropout if num_layers > 1 else 0.0,
+            bidirectional=True,
         )
 
-        # Calculate FC input size
-        fc_input_size = hidden_size * 2 if bidirectional else hidden_size
+        # LayerNorm after LSTM (stabilizes training)
+        lstm_output_size = hidden_size * 2  # bidirectional
+        self.norm = nn.LayerNorm(lstm_output_size)
 
-        # Fully connected layers
-        self.fc = nn.Sequential(
-            nn.Linear(fc_input_size, hidden_size),
-            nn.ReLU(),
+        # Scalar attention pooling
+        self.attn = AttentionPooling(lstm_output_size)
+
+        # MLP classification head with GELU activation
+        self.mlp = nn.Sequential(
+            nn.Linear(lstm_output_size, 256),
+            nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size, hidden_size // 2),
-            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size // 2, num_classes),
+            nn.Linear(128, num_classes),
         )
 
         # Initialize weights
@@ -84,224 +131,38 @@ class LSTMClassifier(BaseModel):
         Returns:
             Output tensor of shape (batch_size, num_classes).
         """
-        # LSTM forward pass
-        lstm_out, (hidden, cell) = self.lstm(x)
-
-        # Use last hidden state
-        if self.bidirectional:
-            # Concatenate forward and backward final hidden states
-            hidden = torch.cat([hidden[-2], hidden[-1]], dim=1)
-        else:
-            hidden = hidden[-1]
-
-        # Classification
-        output = self.fc(hidden)
-
-        return output
-
-    def get_config(self) -> dict[str, Any]:
-        """Get model configuration."""
-        config = super().get_config()
-        config.update({
-            "hidden_size": self.hidden_size,
-            "num_layers": self.num_layers,
-            "dropout": self.dropout_rate,
-            "bidirectional": self.bidirectional,
-        })
-        return config
-
-
-class BiLSTMWithAttention(BaseModel):
-    """Bidirectional LSTM with attention mechanism.
-
-    This model uses attention to weight the importance of different
-    time steps in the sequence.
-    """
-
-    def __init__(
-        self,
-        input_size: int = 258,
-        num_classes: int = 90,
-        hidden_size: int = 256,
-        num_layers: int = 2,
-        dropout: float = 0.3,
-        attention_heads: int = 4,
-        **kwargs: Any,
-    ):
-        """Initialize the BiLSTM with attention.
-
-        Args:
-            input_size: Number of input features per frame.
-            num_classes: Number of output classes.
-            hidden_size: LSTM hidden state size.
-            num_layers: Number of stacked LSTM layers.
-            dropout: Dropout probability.
-            attention_heads: Number of attention heads.
-            **kwargs: Additional arguments.
-        """
-        super().__init__(input_size=input_size, num_classes=num_classes, **kwargs)
-
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.dropout_rate = dropout
-        self.attention_heads = attention_heads
-
-        # Bidirectional LSTM
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers > 1 else 0,
-            bidirectional=True,
-        )
-
-        # Multi-head attention
-        lstm_output_size = hidden_size * 2  # bidirectional
-        self.attention = nn.MultiheadAttention(
-            embed_dim=lstm_output_size,
-            num_heads=attention_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
+        # BiLSTM encoding
+        h, _ = self.lstm(x)  # (B, T, H*2)
 
         # Layer normalization
-        self.layer_norm = nn.LayerNorm(lstm_output_size)
+        h = self.norm(h)
 
-        # Fully connected layers
-        self.fc = nn.Sequential(
-            nn.Linear(lstm_output_size, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_size, num_classes),
-        )
+        # Attention pooling
+        ctx, _ = self.attn(h)  # (B, H*2)
 
-        # Initialize weights
-        self.apply(init_weights)
+        # Classification
+        output = self.mlp(ctx)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass.
+        return output
+
+    def forward_with_attention(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass that also returns attention weights.
+
+        Useful for visualization and interpretability.
 
         Args:
             x: Input tensor of shape (batch_size, seq_length, input_size).
 
         Returns:
-            Output tensor of shape (batch_size, num_classes).
+            Tuple of (logits, attention_weights).
         """
-        # LSTM forward pass
-        lstm_out, _ = self.lstm(x)
-
-        # Self-attention
-        attn_out, _ = self.attention(lstm_out, lstm_out, lstm_out)
-
-        # Residual connection and layer norm
-        attn_out = self.layer_norm(lstm_out + attn_out)
-
-        # Global average pooling over time
-        pooled = attn_out.mean(dim=1)
-
-        # Classification
-        output = self.fc(pooled)
-
-        return output
-
-    def get_config(self) -> dict[str, Any]:
-        """Get model configuration."""
-        config = super().get_config()
-        config.update({
-            "hidden_size": self.hidden_size,
-            "num_layers": self.num_layers,
-            "dropout": self.dropout_rate,
-            "attention_heads": self.attention_heads,
-        })
-        return config
-
-
-class LSTMWithPooling(BaseModel):
-    """LSTM with multiple pooling strategies.
-
-    This model combines max pooling and average pooling over
-    the sequence for more robust feature extraction.
-    """
-
-    def __init__(
-        self,
-        input_size: int = 258,
-        num_classes: int = 90,
-        hidden_size: int = 256,
-        num_layers: int = 2,
-        dropout: float = 0.3,
-        **kwargs: Any,
-    ):
-        """Initialize the LSTM with pooling.
-
-        Args:
-            input_size: Number of input features per frame.
-            num_classes: Number of output classes.
-            hidden_size: LSTM hidden state size.
-            num_layers: Number of stacked LSTM layers.
-            dropout: Dropout probability.
-            **kwargs: Additional arguments.
-        """
-        super().__init__(input_size=input_size, num_classes=num_classes, **kwargs)
-
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.dropout_rate = dropout
-
-        # Bidirectional LSTM
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers > 1 else 0,
-            bidirectional=True,
-        )
-
-        # Batch normalization
-        lstm_output_size = hidden_size * 2
-        self.batch_norm = nn.BatchNorm1d(lstm_output_size * 2)  # max + avg pooling
-
-        # Fully connected layers
-        self.fc = nn.Sequential(
-            nn.Linear(lstm_output_size * 2, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_size, num_classes),
-        )
-
-        # Initialize weights
-        self.apply(init_weights)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass.
-
-        Args:
-            x: Input tensor of shape (batch_size, seq_length, input_size).
-
-        Returns:
-            Output tensor of shape (batch_size, num_classes).
-        """
-        # LSTM forward pass
-        lstm_out, _ = self.lstm(x)
-
-        # Max pooling over time
-        max_pool, _ = lstm_out.max(dim=1)
-
-        # Average pooling over time
-        avg_pool = lstm_out.mean(dim=1)
-
-        # Concatenate pooled features
-        pooled = torch.cat([max_pool, avg_pool], dim=1)
-
-        # Batch normalization
-        pooled = self.batch_norm(pooled)
-
-        # Classification
-        output = self.fc(pooled)
-
-        return output
+        h, _ = self.lstm(x)
+        h = self.norm(h)
+        ctx, attn_weights = self.attn(h)
+        output = self.mlp(ctx)
+        return output, attn_weights
 
     def get_config(self) -> dict[str, Any]:
         """Get model configuration."""

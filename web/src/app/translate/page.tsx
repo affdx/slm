@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { VideoUpload } from "@/components/VideoUpload";
+import { VideoInferencePlayer } from "@/components/VideoInferencePlayer";
 import { WebcamCapture } from "@/components/WebcamCapture";
 import { RealtimeWebcamCapture } from "@/components/RealtimeWebcamCapture";
 import { TranslationResult } from "@/components/TranslationResult";
@@ -14,13 +15,19 @@ import { RealtimePrediction } from "@/hooks/useRealtimeInference";
 import { addHistoryItem } from "@/lib/history";
 
 type InputMode = "upload" | "webcam" | "realtime";
+type UploadSubMode = "quick" | "demo"; // Quick inference vs frame-by-frame demo
 
 export default function TranslatePage() {
   const [mode, setMode] = useState<InputMode>("upload");
+  const [uploadSubMode, setUploadSubMode] = useState<UploadSubMode>("quick");
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [realtimePrediction, setRealtimePrediction] = useState<RealtimePrediction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Store selected video for demo mode
+  const [selectedVideoBlob, setSelectedVideoBlob] = useState<Blob | null>(null);
+  const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
 
   // Store the current video blob for history
   const currentVideoBlobRef = useRef<Blob | null>(null);
@@ -43,6 +50,8 @@ export default function TranslatePage() {
     setResult(null);
     setRealtimePrediction(null);
     setError(null);
+    setSelectedVideoBlob(null);
+    setSelectedFilename(null);
     currentVideoBlobRef.current = null;
   }, []);
 
@@ -52,12 +61,22 @@ export default function TranslatePage() {
 
   const handleVideoSubmit = useCallback(
     async (videoBlob: Blob, filename?: string) => {
+      // Store video blob for history
+      currentVideoBlobRef.current = videoBlob;
+
+      // If in demo mode, just store the video for the player
+      if (mode === "upload" && uploadSubMode === "demo") {
+        setSelectedVideoBlob(videoBlob);
+        setSelectedFilename(filename || null);
+        setError(null);
+        setResult(null);
+        return;
+      }
+
+      // Quick mode: run full inference
       setIsProcessing(true);
       setError(null);
       setResult(null);
-
-      // Store video blob for history
-      currentVideoBlobRef.current = videoBlob;
 
       try {
         // Use client-side inference
@@ -76,7 +95,7 @@ export default function TranslatePage() {
         setIsProcessing(false);
       }
     },
-    [predict]
+    [predict, mode, uploadSubMode]
   );
 
   return (
@@ -208,15 +227,69 @@ export default function TranslatePage() {
           </div>
         </div>
 
+        {/* Upload Sub-Mode Toggle (only for upload mode) */}
+        {mode === "upload" && (
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800 text-sm">
+              <button
+                onClick={() => { setUploadSubMode("quick"); clearResults(); }}
+                className={`px-4 py-1.5 rounded-md font-medium transition-colors ${
+                  uploadSubMode === "quick"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 shadow-sm"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                Quick Inference
+              </button>
+              <button
+                onClick={() => { setUploadSubMode("demo"); clearResults(); }}
+                className={`px-4 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
+                  uploadSubMode === "demo"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 shadow-sm"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Frame-by-Frame Demo
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Input Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-          {mode === "upload" && (
+          {mode === "upload" && !selectedVideoBlob && (
             <VideoUpload
               onSubmit={handleVideoSubmit}
               onFileChange={clearResults}
               isProcessing={isProcessing}
               isModelReady={isReady}
             />
+          )}
+          {mode === "upload" && selectedVideoBlob && uploadSubMode === "demo" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Video Inference Demo
+                </h3>
+                <button
+                  onClick={clearResults}
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Choose Different Video
+                </button>
+              </div>
+              <VideoInferencePlayer
+                videoBlob={selectedVideoBlob}
+                filename={selectedFilename || undefined}
+              />
+            </div>
           )}
           {mode === "webcam" && (
             <WebcamCapture

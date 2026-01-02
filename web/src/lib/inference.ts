@@ -19,13 +19,13 @@ export interface ModelConfig {
 export const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
   baseline: {
     name: "Baseline BiLSTM",
-    description: "Original BiLSTM with attention (92.75% accuracy)",
+    description: "BiLSTM with attention (93.86% accuracy)",
     modelPath: "/model_baseline.onnx",
     normStatsPath: "/model_baseline_norm_stats.json",
   },
   improved: {
     name: "Improved BiLSTM",
-    description: "Optimized training pipeline (92.75% accuracy)",
+    description: "Optimized training pipeline (93.86% accuracy)",
     modelPath: "/model_npy.onnx",
     normStatsPath: "/model_npy_norm_stats.json",
   },
@@ -330,11 +330,12 @@ export async function runInference(
 
   // Run inference
   const startTime = performance.now();
-  const results = await session.run({ landmarks: inputTensor });
+  const results = await session.run({ input: inputTensor });
   const inferenceTime = performance.now() - startTime;
 
-  // Get output logits
-  const logits = results.logits.data as Float32Array;
+  // Get output logits - handle both 'output' and 'logits' naming
+  const outputKey = session.outputNames[0] || "output";
+  const logits = results[outputKey].data as Float32Array;
 
   // Apply softmax to get probabilities
   const probs = softmax(logits);
@@ -418,4 +419,80 @@ export async function preloadModel(modelType?: ModelType): Promise<void> {
   const type = modelType ?? currentModelType;
   await Promise.all([loadModel(type), loadNormStats(type), loadClassMapping()]);
   console.log(`[ONNX] ${MODEL_CONFIGS[type].name}, norm stats, and class mapping preloaded`);
+}
+
+/**
+ * Run sliding window inference on all frames and return the BEST prediction.
+ * 
+ * This processes the video using sliding windows (stride = windowStride frames)
+ * and returns the window with the highest confidence prediction.
+ * 
+ * @param allFrameLandmarks - Array of landmarks for each frame (258 features each)
+ * @param windowSize - Size of sliding window (default 30)
+ * @param windowStride - Stride between windows (default 2)
+ * @param topK - Number of top predictions to return
+ * @param confidenceThreshold - Minimum confidence for valid prediction
+ * @returns Best inference result across all windows
+ */
+export async function runSlidingWindowInference(
+  allFrameLandmarks: Float32Array[],
+  windowSize: number = NUM_FRAMES,
+  windowStride: number = 2,
+  topK: number = 5,
+  confidenceThreshold: number = 0.3,
+  modelType?: ModelType
+): Promise<InferenceResult> {
+  const numFrames = allFrameLandmarks.length;
+  
+  if (numFrames < windowSize) {
+    // Video too short - pad with zeros at beginning
+    const padded = new Float32Array(windowSize * NUM_FEATURES);
+    const padding = windowSize - numFrames;
+    for (let i = 0; i < numFrames; i++) {
+      padded.set(allFrameLandmarks[i], (padding + i) * NUM_FEATURES);
+    }
+    console.log(`[ONNX] Video too short (${numFrames} frames), padding to ${windowSize}`);
+    return runInference(padded, topK, confidenceThreshold, modelType);
+  }
+
+  console.log(`[ONNX] Running sliding window inference: ${numFrames} frames, window=${windowSize}, stride=${windowStride}`);
+  const startTime = performance.now();
+
+  let bestResult: InferenceResult | null = null;
+  let bestConfidence = 0;
+  let windowsProcessed = 0;
+
+  // Process windows with stride
+  for (let startIdx = 0; startIdx <= numFrames - windowSize; startIdx += windowStride) {
+    // Build window landmarks
+    const windowLandmarks = new Float32Array(windowSize * NUM_FEATURES);
+    for (let i = 0; i < windowSize; i++) {
+      windowLandmarks.set(allFrameLandmarks[startIdx + i], i * NUM_FEATURES);
+    }
+
+    // Run inference on this window
+    const result = await runInference(windowLandmarks, topK, confidenceThreshold, modelType);
+    windowsProcessed++;
+
+    // Track best non-unknown result
+    if (result.gloss !== "unknown" && result.confidence > bestConfidence) {
+      bestConfidence = result.confidence;
+      bestResult = result;
+    }
+  }
+
+  const totalTime = performance.now() - startTime;
+  console.log(`[ONNX] Sliding window complete: ${windowsProcessed} windows in ${totalTime.toFixed(0)}ms, best: ${bestResult?.gloss || "unknown"} (${(bestConfidence * 100).toFixed(1)}%)`);
+
+  // If no valid prediction found, return last window result
+  if (!bestResult) {
+    const lastStartIdx = numFrames - windowSize;
+    const lastWindow = new Float32Array(windowSize * NUM_FEATURES);
+    for (let i = 0; i < windowSize; i++) {
+      lastWindow.set(allFrameLandmarks[lastStartIdx + i], i * NUM_FEATURES);
+    }
+    return runInference(lastWindow, topK, confidenceThreshold, modelType);
+  }
+
+  return bestResult;
 }

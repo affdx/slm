@@ -21,19 +21,10 @@ from src.data.preprocessing import (
     extract_landmarks_from_video,
     TOTAL_FEATURES,
 )
-from src.data.transforms import Normalize
-from src.models.lstm import BiLSTMWithAttention, LSTMClassifier, LSTMWithPooling
+from src.models.lstm import BetterLSTM
 from src.utils.device import get_device
 
 logger = logging.getLogger(__name__)
-
-
-# Model registry for loading different architectures
-MODEL_REGISTRY = {
-    "lstm": LSTMClassifier,
-    "bilstm_attention": BiLSTMWithAttention,
-    "lstm_pooling": LSTMWithPooling,
-}
 
 
 @dataclass
@@ -117,8 +108,17 @@ class SignLanguagePredictor:
         # Initialize landmark extractor (lazy loading)
         self._landmark_extractor: Optional[LandmarkExtractor] = None
 
-        # Initialize normalizer (same as used during training)
-        self._normalize = Normalize()
+        # Load normalization stats (per-feature mean/std from training)
+        norm_stats_path = self.model_path.parent / "norm_stats.npz"
+        if norm_stats_path.exists():
+            stats = np.load(norm_stats_path)
+            self._feat_mean = stats["mean"]
+            self._feat_std = stats["std"]
+            logger.info("Loaded per-feature normalization stats")
+        else:
+            logger.warning("norm_stats.npz not found, using per-sample normalization")
+            self._feat_mean = None
+            self._feat_std = None
 
         logger.info(f"Predictor initialized on device: {self.device}")
         logger.info(f"Model loaded from: {self.model_path}")
@@ -145,19 +145,33 @@ class SignLanguagePredictor:
             weights_only=False,
         )
 
-        # Get model config
-        config = checkpoint.get("model_config", {})
-        model_type = config.pop("model_type", "bilstm_attention")
-        config.pop("num_parameters", None)  # Remove non-constructor args
+        # Handle both checkpoint formats:
+        # 1. Full checkpoint with model_state_dict and model_config
+        # 2. Raw state dict (just the model weights)
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            # Full checkpoint format
+            config = checkpoint.get("model_config", {})
+            config.pop("num_parameters", None)  # Remove non-constructor args
+            model = BetterLSTM(**config)
+            model.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            # Raw state dict - use default config based on weights
+            # Infer config from state dict
+            num_classes = checkpoint["mlp.6.weight"].shape[0]
+            input_size = checkpoint["lstm.weight_ih_l0"].shape[1]
+            hidden_size = checkpoint["lstm.weight_hh_l0"].shape[1]
+            
+            config = {
+                "input_size": input_size,
+                "hidden_size": hidden_size,
+                "num_classes": num_classes,
+                "num_layers": 2,  # Default
+                "dropout": 0.3,  # Default
+            }
+            model = BetterLSTM(**config)
+            model.load_state_dict(checkpoint)
 
-        # Get model class
-        model_cls = MODEL_REGISTRY.get(model_type, BiLSTMWithAttention)
-
-        # Create and load model
-        model = model_cls(**config)
-        model.load_state_dict(checkpoint["model_state_dict"])
         model = model.to(self.device)
-
         return model
 
     @property
@@ -238,8 +252,15 @@ class SignLanguagePredictor:
             )
 
         # Apply normalization (same as during training)
-        # Normalize each sample independently
-        normalized = np.array([self._normalize(sample) for sample in landmarks])
+        if self._feat_mean is not None and self._feat_std is not None:
+            # Per-feature normalization (same as training)
+            normalized = (landmarks - self._feat_mean) / self._feat_std
+        else:
+            # Fallback: per-sample normalization
+            normalized = np.array([
+                (sample - sample.mean()) / (sample.std() + 1e-6)
+                for sample in landmarks
+            ])
 
         # Convert to tensor and move to device
         tensor = torch.from_numpy(normalized).float().to(self.device)
@@ -299,7 +320,13 @@ class SignLanguagePredictor:
             )
 
         # Apply normalization (same as during training)
-        normalized = np.array([self._normalize(sample) for sample in landmarks_batch])
+        if self._feat_mean is not None and self._feat_std is not None:
+            normalized = (landmarks_batch - self._feat_mean) / self._feat_std
+        else:
+            normalized = np.array([
+                (sample - sample.mean()) / (sample.std() + 1e-6)
+                for sample in landmarks_batch
+            ])
 
         # Convert to tensor
         tensor = torch.from_numpy(normalized).float().to(self.device)

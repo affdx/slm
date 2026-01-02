@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   runInference,
+  runSlidingWindowInference,
   preloadModel,
   isModelLoaded,
   getGlosses,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/inference";
 import {
   extractLandmarksFromBlob,
+  extractAllFrameLandmarksFromBlob,
   preloadLandmarkers,
   areLandmarkersReady,
   getCurrentDelegate,
@@ -107,7 +109,7 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
   }, [isReady]);
 
   /**
-   * Run prediction on a video blob
+   * Run prediction on a video blob using sliding window for best accuracy
    */
   const predict = useCallback(
     async (videoBlob: Blob): Promise<PredictionResult> => {
@@ -118,15 +120,21 @@ export function useSignLanguageInference(): UseSignLanguageInferenceReturn {
 
       const totalStartTime = performance.now();
 
-      // Extract landmarks
-      console.log("[Hook] Starting landmark extraction...");
+      // Extract ALL frame landmarks (for sliding window)
+      console.log("[Hook] Starting landmark extraction (all frames)...");
       const landmarkStartTime = performance.now();
-      const landmarks = await extractLandmarksFromBlob(videoBlob);
+      const allFrameLandmarks = await extractAllFrameLandmarksFromBlob(videoBlob);
       const landmarkTime = performance.now() - landmarkStartTime;
 
-      // Run inference
-      console.log("[Hook] Running inference...");
-      const result = await runInference(landmarks, 5, 0.3);
+      // Run sliding window inference to find best prediction
+      console.log("[Hook] Running sliding window inference...");
+      const result = await runSlidingWindowInference(
+        allFrameLandmarks,
+        30,  // window size
+        2,   // stride (every 2 frames)
+        5,   // top-k
+        0.3  // confidence threshold
+      );
 
       const totalTime = performance.now() - totalStartTime;
 
