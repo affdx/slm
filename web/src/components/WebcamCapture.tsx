@@ -137,6 +137,9 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         setPreviewUrl(URL.createObjectURL(blob));
         setIsRecording(false);
         setRecordingDuration(0);
+        
+        // Auto-submit for inference
+        onCapture(blob);
       };
 
       mediaRecorder.start();
@@ -147,13 +150,13 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
 
-      // Auto-stop after 10 seconds
+      // Auto-stop after 5 seconds
       setTimeout(() => {
         if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.stop();
           clearInterval(durationInterval);
         }
-      }, 10000);
+      }, 5000);
 
       // Store interval reference for manual stop
       mediaRecorderRef.current.ondataavailable = (e) => {
@@ -179,13 +182,6 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
       setPreviewUrl(null);
     }
   }, [previewUrl]);
-
-  // Submit recorded video
-  const handleSubmit = useCallback(() => {
-    if (recordedBlob) {
-      onCapture(recordedBlob);
-    }
-  }, [recordedBlob, onCapture]);
 
   // Auto-start webcam when component mounts, stop when unmounting
   useEffect(() => {
@@ -253,7 +249,7 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         {isRecording && (
           <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-            <span className="text-sm font-medium">REC {recordingDuration}s / 10s</span>
+            <span className="text-sm font-medium">REC {recordingDuration}s / 5s</span>
           </div>
         )}
       </div>
@@ -284,20 +280,19 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
 
         {recordedBlob && (
           <>
-            <button
-              onClick={handleSubmit}
-              disabled={isProcessing || !isModelReady}
-              className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isProcessing ? "Processing..." : !isModelReady ? "Loading model..." : "Translate Sign Language"}
-            </button>
-            <button
-              onClick={resetRecording}
-              disabled={isProcessing}
-              className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              Record Again
-            </button>
+            {isProcessing ? (
+              <div className="px-6 py-3 bg-primary-600/80 text-white font-medium rounded-lg flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <span>Processing...</span>
+              </div>
+            ) : (
+              <button
+                onClick={resetRecording}
+                className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Record Again
+              </button>
+            )}
           </>
         )}
       </div>
@@ -305,7 +300,7 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
       {/* Instructions */}
       <div className="text-center text-sm text-gray-500 dark:text-gray-400 space-y-1">
         <p>Position yourself in the frame with good lighting</p>
-        <p>Perform the sign clearly within the 10-second recording window</p>
+        <p>Recording auto-translates after 5 seconds</p>
       </div>
     </div>
   );
