@@ -1,20 +1,10 @@
 "use client";
 
 import { PredictionResult } from "@/hooks/useSignLanguageInference";
+import { formatConfidence, formatGlossName } from "@/lib/format";
 
 interface TranslationResultProps {
   result: PredictionResult;
-}
-
-function formatConfidence(confidence: number): string {
-  return `${(confidence * 100).toFixed(1)}%`;
-}
-
-function formatGlossName(gloss: string): string {
-  return gloss
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 export function TranslationResult({ result }: TranslationResultProps) {

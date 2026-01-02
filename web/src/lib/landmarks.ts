@@ -18,7 +18,6 @@ const NUM_HAND_LANDMARKS = 21;
 const POSE_FEATURES = NUM_POSE_LANDMARKS * 4; // x, y, z, visibility = 132
 const HAND_FEATURES = NUM_HAND_LANDMARKS * 3; // x, y, z = 63
 const TOTAL_FEATURES = POSE_FEATURES + HAND_FEATURES * 2; // 132 + 63 + 63 = 258
-const NUM_FRAMES = 30;
 
 // Singleton Holistic instance
 let holistic: Holistic | null = null;
@@ -68,7 +67,7 @@ async function initializeHolistic(): Promise<void> {
 /**
  * Ensure Holistic is initialized (singleton pattern)
  */
-export async function ensureLandmarkersReady(): Promise<void> {
+async function ensureLandmarkersReady(): Promise<void> {
   if (!initPromise) {
     initPromise = initializeHolistic();
   }
@@ -150,98 +149,6 @@ async function processFrame(canvas: HTMLCanvasElement): Promise<Float32Array> {
 }
 
 /**
- * Extract landmarks from a video element using SLIDING WINDOW approach.
- * 
- * This matches the baseline training approach:
- * - Process ALL frames in the video sequentially
- * - Use the LAST N frames for prediction (sliding window)
- *
- * @param video - Video element to process
- * @param numFrames - Number of frames to use for prediction (default 30)
- * @returns Float32Array of shape [numFrames * 258]
- */
-export async function extractLandmarksFromVideo(
-  video: HTMLVideoElement,
-  numFrames: number = NUM_FRAMES
-): Promise<Float32Array> {
-  await ensureLandmarkersReady();
-
-  if (!holistic) {
-    throw new Error("Holistic not initialized");
-  }
-
-  const duration = video.duration;
-  if (!duration || duration === 0) {
-    throw new Error("Invalid video duration");
-  }
-
-  const estimatedFps = 30;
-  const estimatedTotalFrames = Math.ceil(duration * estimatedFps);
-
-  console.log(
-    `[MediaPipe] Processing video: ${duration.toFixed(2)}s, ~${estimatedTotalFrames} frames (sliding window, last ${numFrames})`
-  );
-  const startTime = performance.now();
-
-  // Create canvas for frame extraction
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Failed to create canvas context");
-  }
-
-  // Process ALL frames and store landmarks
-  const allFrameLandmarks: Float32Array[] = [];
-  const frameInterval = 1 / estimatedFps;
-
-  for (let time = 0; time < duration; time += frameInterval) {
-    // Seek to frame time
-    video.currentTime = time;
-    await new Promise<void>((resolve) => {
-      const onSeeked = () => {
-        video.removeEventListener("seeked", onSeeked);
-        resolve();
-      };
-      video.addEventListener("seeked", onSeeked);
-    });
-
-    // Draw frame to canvas
-    ctx.drawImage(video, 0, 0);
-
-    // Process with Holistic
-    const landmarks = await processFrame(canvas);
-    allFrameLandmarks.push(landmarks);
-  }
-
-  console.log(`[MediaPipe] Processed ${allFrameLandmarks.length} total frames`);
-
-  // Use LAST N frames (sliding window approach matching baseline)
-  const result = new Float32Array(numFrames * TOTAL_FEATURES);
-
-  if (allFrameLandmarks.length >= numFrames) {
-    const startIdx = allFrameLandmarks.length - numFrames;
-    for (let i = 0; i < numFrames; i++) {
-      result.set(allFrameLandmarks[startIdx + i], i * TOTAL_FEATURES);
-    }
-  } else {
-    // Video too short - pad with zeros at beginning
-    const padding = numFrames - allFrameLandmarks.length;
-    for (let i = 0; i < allFrameLandmarks.length; i++) {
-      result.set(allFrameLandmarks[i], (padding + i) * TOTAL_FEATURES);
-    }
-  }
-
-  const extractionTime = performance.now() - startTime;
-  console.log(
-    `[MediaPipe] Extraction completed in ${extractionTime.toFixed(0)}ms`
-  );
-
-  return result;
-}
-
-/**
  * Extract ALL frame landmarks from a video (for sliding window inference).
  * 
  * Returns an array of landmarks for each frame, which can be used to
@@ -250,7 +157,7 @@ export async function extractLandmarksFromVideo(
  * @param video - Video element to process
  * @returns Array of Float32Array, one per frame (each with 258 features)
  */
-export async function extractAllFrameLandmarks(
+async function extractAllFrameLandmarks(
   video: HTMLVideoElement
 ): Promise<Float32Array[]> {
   await ensureLandmarkersReady();
@@ -336,42 +243,6 @@ export async function extractAllFrameLandmarksFromBlob(
 }
 
 /**
- * Extract landmarks from a video blob
- */
-export async function extractLandmarksFromBlob(
-  blob: Blob,
-  numFrames: number = NUM_FRAMES
-): Promise<Float32Array> {
-  const video = document.createElement("video");
-  video.playsInline = true;
-  video.muted = true;
-
-  const url = URL.createObjectURL(blob);
-  video.src = url;
-
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve();
-    video.onerror = () => reject(new Error("Failed to load video"));
-  });
-
-  try {
-    return await extractLandmarksFromVideo(video, numFrames);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-/**
- * Extract landmarks from a single canvas frame (for real-time processing)
- */
-export async function extractLandmarksFromFrame(
-  canvas: HTMLCanvasElement
-): Promise<Float32Array> {
-  await ensureLandmarkersReady();
-  return processFrame(canvas);
-}
-
-/**
  * Check if Holistic is ready
  */
 export function areLandmarkersReady(): boolean {
@@ -384,32 +255,6 @@ export function areLandmarkersReady(): boolean {
 export async function preloadLandmarkers(): Promise<void> {
   await ensureLandmarkersReady();
   console.log("[MediaPipe] Holistic preloaded");
-}
-
-/**
- * Get feature dimensions info
- */
-export function getFeatureDimensions() {
-  return {
-    numFrames: NUM_FRAMES,
-    numFeatures: TOTAL_FEATURES,
-    poseFeatures: POSE_FEATURES,
-    handFeatures: HAND_FEATURES,
-    totalLength: NUM_FRAMES * TOTAL_FEATURES,
-  };
-}
-
-// Legacy exports for compatibility
-export function getCurrentDelegate(): "GPU" | "CPU" {
-  return "CPU"; // Holistic doesn't have GPU/CPU toggle
-}
-
-export async function setDelegate(_delegate: "GPU" | "CPU"): Promise<void> {
-  // No-op for Holistic
-}
-
-export async function toggleDelegate(): Promise<"GPU" | "CPU"> {
-  return "CPU";
 }
 
 /**
@@ -440,7 +285,7 @@ export interface LandmarkExtractionResult {
 }
 
 // Pose connections for drawing
-export const POSE_CONNECTIONS: [number, number][] = [
+const POSE_CONNECTIONS: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
   [9, 10], [11, 12], [11, 23], [12, 24], [23, 24],
   [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
@@ -450,7 +295,7 @@ export const POSE_CONNECTIONS: [number, number][] = [
 ];
 
 // Hand connections for drawing
-export const HAND_CONNECTIONS: [number, number][] = [
+const HAND_CONNECTIONS: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
   [0, 9], [9, 10], [10, 11], [11, 12],

@@ -38,11 +38,9 @@ export default function TranslatePage() {
     isLoading, 
     loadingProgress, 
     error: modelError, 
-    delegate,
     currentModel,
     availableModels,
     predict,
-    switchDelegate,
     switchModel,
   } = useSignLanguageInference();
 
@@ -116,64 +114,27 @@ export default function TranslatePage() {
             Client-side inference (no server required)
           </div>
 
-          {/* Model and Processing Controls */}
+          {/* Model Controls */}
           {isReady && (
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-              {/* Model Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Model:</span>
-                <select
-                  value={currentModel}
-                  onChange={(e) => switchModel(e.target.value as typeof currentModel)}
-                  disabled={isLoading || isProcessing}
-                  className={`
-                    text-xs px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600
-                    bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200
-                    focus:outline-none focus:ring-2 focus:ring-primary-500
-                    ${(isLoading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                  `}
-                >
-                  {availableModels.map(({ type, config }) => (
-                    <option key={type} value={type}>
-                      {config.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Divider */}
-              <div className="hidden sm:block w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-
-              {/* Processing Mode Toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Processing:</span>
-                <button
-                  onClick={() => switchDelegate(delegate === "GPU" ? "CPU" : "GPU")}
-                  disabled={isLoading || isProcessing}
-                  className={`
-                    relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                    ${delegate === "GPU" 
-                      ? "bg-primary-600" 
-                      : "bg-gray-300 dark:bg-gray-600"
-                    }
-                    ${(isLoading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                  `}
-                  title={`Currently using ${delegate}. Click to switch to ${delegate === "GPU" ? "CPU" : "GPU"}.`}
-                >
-                  <span
-                    className={`
-                      inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                      ${delegate === "GPU" ? "translate-x-6" : "translate-x-1"}
-                    `}
-                  />
-                </button>
-                <span className={`text-xs font-medium ${delegate === "GPU" ? "text-primary-600" : "text-gray-600 dark:text-gray-400"}`}>
-                  {delegate}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  ({delegate === "GPU" ? "faster" : "compatible"})
-                </span>
-              </div>
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Model:</span>
+              <select
+                value={currentModel}
+                onChange={(e) => switchModel(e.target.value as typeof currentModel)}
+                disabled={isLoading || isProcessing}
+                className={`
+                  text-xs px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600
+                  bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200
+                  focus:outline-none focus:ring-2 focus:ring-primary-500
+                  ${(isLoading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                `}
+              >
+                {availableModels.map(({ type, config }) => (
+                  <option key={type} value={type}>
+                    {config.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>
