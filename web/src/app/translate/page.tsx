@@ -190,15 +190,17 @@ export default function TranslatePage() {
               </div>
             )}
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm min-h-[400px] flex flex-col relative">
-              <div className="flex-1 p-2">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm h-[500px] flex flex-col relative">
+              <div className="flex-1 p-2 flex flex-col">
                 {mode === "upload" && !selectedVideoBlob && (
-                  <VideoUpload
-                    onSubmit={handleVideoSubmit}
-                    onFileChange={clearResults}
-                    isProcessing={isProcessing}
-                    isModelReady={isReady}
-                  />
+                  <div className="flex-1 flex flex-col">
+                    <VideoUpload
+                      onSubmit={handleVideoSubmit}
+                      onFileChange={clearResults}
+                      isProcessing={isProcessing}
+                      isModelReady={isReady}
+                    />
+                  </div>
                 )}
                 
                 {mode === "upload" && selectedVideoBlob && uploadSubMode === "demo" && (
