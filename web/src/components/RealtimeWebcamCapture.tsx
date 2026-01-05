@@ -361,7 +361,7 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
       )}
 
       {/* Main Video Area */}
-      <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video">
+      <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video min-h-[400px] md:min-h-0">
         {!isStreaming && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-white mb-4"></div>
