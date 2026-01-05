@@ -7,7 +7,7 @@
  */
 
 // Model configuration
-export type ModelType = "baseline" | "improved";
+export type ModelType = "baseline" | "improved" | "tcn";
 
 export interface ModelConfig {
   name: string;
@@ -28,6 +28,12 @@ export const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
     description: "Optimized training pipeline (93.86% accuracy)",
     modelPath: "/model_npy.onnx",
     normStatsPath: "/model_npy_norm_stats.json",
+  },
+  tcn: {
+    name: "Causal TCN",
+    description: "Temporal CNN - real-time optimized, causal inference",
+    modelPath: "/model_tcn.onnx",
+    normStatsPath: "/model_tcn_norm_stats.json",
   },
 };
 
