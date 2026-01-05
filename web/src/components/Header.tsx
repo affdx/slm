@@ -8,6 +8,7 @@ import { useTheme } from "./ThemeProvider";
 const navigation = [
   { name: "Home", href: "/" },
   { name: "Translate", href: "/translate" },
+  { name: "Live V2", href: "/translate-v2", badge: "NEW" },
   { name: "Dictionary", href: "/dictionary" },
   { name: "History", href: "/history" },
   { name: "About", href: "/about" },
@@ -218,7 +219,14 @@ export function Header() {
                   {isActive && (
                     <span className="absolute inset-0 bg-primary-100 dark:bg-primary-900/30 rounded-full -z-10" aria-hidden="true" />
                   )}
-                  {item.name}
+                  <span className="flex items-center gap-1.5">
+                    {item.name}
+                    {"badge" in item && item.badge && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-purple-500 text-white rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
                 </Link>
               );
             })}
