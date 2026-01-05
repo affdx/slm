@@ -78,12 +78,12 @@
 - [x] 6.15 Add responsive design for mobile devices
 
 ### Phase 7: Accessibility & UX
-- [ ] 7.1 Implement high contrast mode toggle
-- [ ] 7.2 Add proper ARIA labels to all interactive elements
-- [ ] 7.3 Ensure keyboard navigation works throughout app
-- [ ] 7.4 Add screen reader support for translation results
-- [ ] 7.5 Test with WCAG 2.1 AA checker - fix issues
-- [ ] 7.6 Add visual feedback during video processing
+- [x] 7.1 Implement high contrast mode toggle
+- [x] 7.2 Add proper ARIA labels to all interactive elements
+- [x] 7.3 Ensure keyboard navigation works throughout app
+- [x] 7.4 Add screen reader support for translation results
+- [x] 7.5 Test with WCAG 2.1 AA checker - fix issues
+- [x] 7.6 Add visual feedback during video processing
 
 ### Phase 8: Testing & Quality
 - [x] 8.1 Set up pytest configuration (pytest.ini)

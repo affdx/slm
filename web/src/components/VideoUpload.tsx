@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useToast } from "./Toast";
 
 interface VideoUploadProps {
   onSubmit: (video: Blob, filename?: string) => void;
@@ -14,6 +15,7 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -26,16 +28,14 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
   }, []);
 
   const processFile = useCallback((file: File) => {
-    // Validate file type
     const validTypes = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"];
     if (!validTypes.includes(file.type)) {
-      alert("Please upload a valid video file (MP4, WebM, MOV, or AVI)");
+      showToast("Please upload a valid video file (MP4, WebM, MOV, or AVI)", "error");
       return;
     }
 
-    // Validate file size (max 100MB)
     if (file.size > 100 * 1024 * 1024) {
-      alert("File size must be less than 100MB");
+      showToast("File size must be less than 100MB", "error");
       return;
     }
 
@@ -45,9 +45,8 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
       return URL.createObjectURL(file);
     });
 
-    // Notify parent that file changed (to clear previous results)
     onFileChange?.();
-  }, [onFileChange]);
+  }, [onFileChange, showToast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -99,6 +98,8 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
+          role="region"
+          aria-label="Video upload drop zone"
         >
           <input
             ref={fileInputRef}
@@ -106,6 +107,7 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
             accept="video/*"
             onChange={handleChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            aria-label="Upload video file. Accepted formats: MP4, WebM, MOV, AVI. Maximum size: 100MB"
           />
           <div className="text-center">
             <svg
@@ -188,7 +190,9 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
           <button
             onClick={handleSubmit}
             disabled={isProcessing || !isModelReady}
-            className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label={isProcessing ? "Processing video" : !isModelReady ? "Loading AI model" : "Translate sign language from video"}
+            aria-busy={isProcessing}
+            className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             {isProcessing ? "Processing..." : !isModelReady ? "Loading model..." : "Translate Sign Language"}
           </button>

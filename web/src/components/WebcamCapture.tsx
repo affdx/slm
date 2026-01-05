@@ -216,10 +216,10 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
       )}
 
       {/* Video Display */}
-      <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video">
+      <div className="relative rounded-xl overflow-hidden bg-gray-900 aspect-video" role="region" aria-label="Video preview area">
         {!isStreaming && !recordedBlob && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-white mb-4"></div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white" aria-live="polite">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-white mb-4" aria-hidden="true"></div>
             <p className="text-gray-400">Starting camera...</p>
           </div>
         )}
@@ -231,37 +231,41 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
           playsInline
           muted
           className={`w-full h-full object-cover ${recordedBlob ? "hidden" : ""}`}
+          aria-label="Live webcam feed"
         />
 
         {/* Preview recorded video */}
         {previewUrl && (
-          <video src={previewUrl} controls className="w-full h-full object-contain" />
+          <video src={previewUrl} controls className="w-full h-full object-contain" aria-label="Recorded video preview" />
         )}
 
         {/* Countdown Overlay */}
         {countdown !== null && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center" role="status" aria-live="assertive">
             <span className="text-8xl font-bold text-white animate-pulse">{countdown}</span>
+            <span className="sr-only">Recording starts in {countdown} seconds</span>
           </div>
         )}
 
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full">
-            <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+          <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full" role="status" aria-live="polite">
+            <span className="w-3 h-3 bg-white rounded-full animate-pulse" aria-hidden="true"></span>
             <span className="text-sm font-medium">REC {recordingDuration}s / 5s</span>
+            <span className="sr-only">Recording in progress: {recordingDuration} of 5 seconds</span>
           </div>
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex flex-wrap gap-3 justify-center" role="group" aria-label="Recording controls">
         {isStreaming && !isRecording && !recordedBlob && countdown === null && (
           <button
             onClick={startRecording}
-            className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+            aria-label="Start recording with 3 second countdown"
+            className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
-            <span className="w-3 h-3 bg-white rounded-full"></span>
+            <span className="w-3 h-3 bg-white rounded-full" aria-hidden="true"></span>
             <span>Record (3s countdown)</span>
           </button>
         )}
@@ -269,9 +273,10 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         {isRecording && (
           <button
             onClick={stopRecording}
-            className="px-6 py-3 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 transition-colors flex items-center space-x-2"
+            aria-label="Stop recording"
+            className="px-6 py-3 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 transition-colors flex items-center space-x-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="6" y="6" width="12" height="12" rx="1" />
             </svg>
             <span>Stop Recording</span>
@@ -281,14 +286,15 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         {recordedBlob && (
           <>
             {isProcessing ? (
-              <div className="px-6 py-3 bg-primary-600/80 text-white font-medium rounded-lg flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+              <div className="px-6 py-3 bg-primary-600/80 text-white font-medium rounded-lg flex items-center space-x-2" role="status" aria-live="polite">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" aria-hidden="true"></div>
                 <span>Processing...</span>
               </div>
             ) : (
               <button
                 onClick={resetRecording}
-                className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                aria-label="Record a new video"
+                className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
               >
                 Record Again
               </button>
