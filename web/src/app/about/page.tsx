@@ -130,6 +130,7 @@ export default function AboutPage() {
             <TechCard
               title="MediaPipe Holistic"
               version="0.5.1675471629"
+              description="Google's ML framework for real-time pose estimation. Extracts body and hand landmarks from video frames entirely in the browser."
               items={[
                 "33 pose landmarks (x, y, z, visibility)",
                 "21 left hand landmarks (x, y, z)",
@@ -140,6 +141,7 @@ export default function AboutPage() {
             <TechCard
               title="ONNX Runtime Web"
               version="1.14.0"
+              description="Microsoft's cross-platform ML inference engine. Runs PyTorch models in the browser via WebAssembly without needing a server."
               items={[
                 "WebAssembly backend (WASM)",
                 "Single-threaded for compatibility",
@@ -150,6 +152,7 @@ export default function AboutPage() {
             <TechCard
               title="BiLSTM Model"
               version="969K params"
+              description="Bidirectional LSTM neural network trained on Malaysian Sign Language gestures. Processes 30-frame sequences to classify signs."
               items={[
                 "2-layer Bidirectional LSTM",
                 "Hidden size: 128",
@@ -558,15 +561,16 @@ function ArchArrow() {
   );
 }
 
-function TechCard({ title, version, items }: { title: string; version: string; items: string[] }) {
+function TechCard({ title, version, description, items }: { title: string; version: string; description: string; items: string[] }) {
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
         <span className="text-xs font-mono bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
           {version}
         </span>
       </div>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{description}</p>
       <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
         {items.map((item, i) => (
           <li key={i} className="flex items-start gap-2">
