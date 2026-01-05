@@ -8,7 +8,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">MSL Translator</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Isyarat</span>
             <span className="text-gray-300 dark:text-gray-700 hidden md:inline" aria-hidden="true">|</span>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Breaking communication barriers.

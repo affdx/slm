@@ -1,5 +1,5 @@
 {
-  "name": "msl-translator-web",
+  "name": "isyarat-web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
-  "description": "Malaysian Sign Language Translation Web Application",
+  "description": "Isyarat - Malaysian Sign Language (Bahasa Isyarat Malaysia) Translation",
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/drawing_utils": "^0.3.1675466124",

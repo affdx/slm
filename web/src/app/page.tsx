@@ -47,7 +47,7 @@ export default function Home() {
       <section className="py-24 bg-white dark:bg-slate-900/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Why use MSL Translator?</h2>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Why use Isyarat?</h2>
             <p className="text-gray-500 dark:text-gray-400">Built with modern technology for maximum accessibility</p>
           </div>
           
