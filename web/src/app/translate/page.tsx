@@ -92,12 +92,22 @@ export default function TranslatePage() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Translate
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Real-time Malaysian Sign Language translation
-            </p>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                Translate
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 mt-1">
+                Real-time Malaysian Sign Language translation
+              </p>
+              <div className="mt-2">
+                <a
+                  href="/translate/tcn"
+                  className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+                >
+                  Try TCN Model →
+                </a>
+              </div>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">

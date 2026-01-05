@@ -7,7 +7,7 @@
  */
 
 // Model configuration
-export type ModelType = "baseline" | "improved";
+export type ModelType = "baseline" | "improved" | "tcn";
 
 export interface ModelConfig {
   name: string;
@@ -28,6 +28,12 @@ export const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
     description: "Optimized training pipeline (93.86% accuracy)",
     modelPath: "/model_npy.onnx",
     normStatsPath: "/model_npy_norm_stats.json",
+  },
+  tcn: {
+    name: "Causal TCN",
+    description: "Temporal Convolutional Network optimized for real-time inference",
+    modelPath: "/model_tcn.onnx",
+    normStatsPath: "/model_tcn_norm_stats.json",
   },
 };
 
@@ -97,7 +103,7 @@ async function getOrt(): Promise<OrtModule> {
   console.log("[ONNX] Loading ONNX Runtime from CDN...");
 
   const cdnUrl =
-    "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.min.js";
+    "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/ort.min.js";
 
   // Check if already loaded (from script tag)
   if (

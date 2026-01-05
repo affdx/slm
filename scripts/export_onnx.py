@@ -25,30 +25,100 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.models.lstm import BetterLSTM
+from src.models.tcn import CausalTCNClassifier
 
 
 def load_model(
     checkpoint_path: Path,
     device: torch.device,
+    model_type: str | None = None,
+    meta_path: Path | None = None,
 ) -> tuple[torch.nn.Module, dict]:
-    """Load BetterLSTM model from checkpoint or weights file."""
+    """Load model from checkpoint or weights file.
+    
+    Supports both BetterLSTM and CausalTCNClassifier models.
+    
+    Args:
+        checkpoint_path: Path to checkpoint or weights file.
+        device: Device to load model onto.
+        model_type: Model type ("lstm" or "tcn"). Auto-detected if None.
+        meta_path: Path to metadata JSON file (for TCN models).
+    
+    Returns:
+        Tuple of (model, config_dict).
+    """
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
     state = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
-    # Check if this is a full checkpoint or just weights
-    if "model_state_dict" in state:
-        # Full checkpoint
-        config = state.get("model_config", {})
-        config.pop("num_parameters", None)
-        model = BetterLSTM(**config)
-        model.load_state_dict(state["model_state_dict"])
+    # Determine model type
+    if model_type is None:
+        # Try to detect from checkpoint or meta file
+        if meta_path and meta_path.exists():
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+                model_type = meta.get("model", "").lower()
+                if "tcn" in model_type or "causal" in model_type:
+                    model_type = "tcn"
+                else:
+                    model_type = "lstm"
+        elif "model_config" in state:
+            config = state.get("model_config", {})
+            model_type = config.get("model", "").lower()
+            if "tcn" in model_type or "causal" in model_type:
+                model_type = "tcn"
+            else:
+                model_type = "lstm"
+        else:
+            # Default to LSTM for backward compatibility
+            model_type = "lstm"
+    
+    # Load model based on type
+    if model_type == "tcn":
+        # For TCN, we typically need meta file for config
+        if meta_path and meta_path.exists():
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+                config = {
+                    "input_size": meta.get("input_size", 258),
+                    "num_classes": meta.get("num_classes", 90),
+                    "channels": meta.get("channels", 256),
+                    "levels": meta.get("levels", 6),
+                    "kernel_size": meta.get("kernel_size", 3),
+                    "dropout": meta.get("dropout", 0.25),
+                }
+        elif "model_config" in state:
+            config = state.get("model_config", {})
+            config.pop("num_parameters", None)
+        else:
+            # Default config for TCN
+            config = {
+                "input_size": 258,
+                "num_classes": 90,
+                "channels": 256,
+                "levels": 6,
+                "kernel_size": 3,
+                "dropout": 0.25,
+            }
+        
+        model = CausalTCNClassifier(**config)
+        
+        if "model_state_dict" in state:
+            model.load_state_dict(state["model_state_dict"])
+        else:
+            model.load_state_dict(state)
     else:
-        # Just weights (state_dict)
-        model = BetterLSTM()
-        model.load_state_dict(state)
-        config = model.get_config()
+        # LSTM model
+        if "model_state_dict" in state:
+            config = state.get("model_config", {})
+            config.pop("num_parameters", None)
+            model = BetterLSTM(**config)
+            model.load_state_dict(state["model_state_dict"])
+        else:
+            model = BetterLSTM()
+            model.load_state_dict(state)
+            config = model.get_config()
     
     model = model.to(device)
     model.eval()
@@ -171,6 +241,19 @@ def main() -> None:
         help="Path to model checkpoint or weights file",
     )
     parser.add_argument(
+        "--meta",
+        type=str,
+        default=None,
+        help="Path to model metadata JSON file (for TCN models)",
+    )
+    parser.add_argument(
+        "--model-type",
+        type=str,
+        choices=["lstm", "tcn"],
+        default=None,
+        help="Model type (lstm or tcn). Auto-detected if not specified.",
+    )
+    parser.add_argument(
         "--norm-stats",
         type=str,
         default="models/norm_stats.npz",
@@ -198,6 +281,7 @@ def main() -> None:
     args = parser.parse_args()
 
     checkpoint_path = Path(args.checkpoint)
+    meta_path = Path(args.meta) if args.meta else None
     norm_stats_path = Path(args.norm_stats)
     output_path = Path(args.output)
 
@@ -208,7 +292,7 @@ def main() -> None:
 
     # Load model
     print(f"Loading model from {checkpoint_path}")
-    model, config = load_model(checkpoint_path, device)
+    model, config = load_model(checkpoint_path, device, args.model_type, meta_path)
     print(f"Model config: {config}")
 
     # Export to ONNX
