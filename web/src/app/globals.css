@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary-50: #f0fdfa;
   --color-primary-100: #ccfbf1;
@@ -20,12 +22,16 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 241, 245, 249;
-    --background-start-rgb: 15, 23, 42;
-    --background-end-rgb: 2, 6, 23;
-  }
+:root.dark {
+  --foreground-rgb: 241, 245, 249;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 2, 6, 23;
+}
+
+:root.light {
+  --foreground-rgb: 30, 41, 59;
+  --background-start-rgb: 250, 250, 250;
+  --background-end-rgb: 255, 255, 255;
 }
 
 body {
@@ -59,14 +65,12 @@ body {
   background: #94a3b8;
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: #334155;
-  }
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
-  }
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 @layer utilities {
@@ -76,6 +80,10 @@ body {
   
   .glass-panel {
     @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-gray-200 dark:border-gray-800 shadow-sm;
+  }
+  
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
   }
 }
 
@@ -105,4 +113,69 @@ body {
 
 video, canvas {
   transition: none;
+}
+
+.high-contrast {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+
+.high-contrast body {
+  background: #000;
+  color: #fff;
+}
+
+.high-contrast * {
+  border-color: #fff !important;
+}
+
+.high-contrast a,
+.high-contrast button {
+  outline: 2px solid transparent;
+}
+
+.high-contrast a:focus,
+.high-contrast button:focus,
+.high-contrast input:focus,
+.high-contrast select:focus,
+.high-contrast textarea:focus {
+  outline: 3px solid #ffff00 !important;
+  outline-offset: 2px;
+}
+
+.high-contrast .bg-white,
+.high-contrast .bg-gray-50,
+.high-contrast .bg-gray-100 {
+  background-color: #000 !important;
+}
+
+.high-contrast .text-gray-500,
+.high-contrast .text-gray-600,
+.high-contrast .text-gray-400 {
+  color: #fff !important;
+}
+
+.high-contrast .text-gray-900,
+.high-contrast .text-gray-800,
+.high-contrast .text-gray-700 {
+  color: #fff !important;
+}
+
+.high-contrast .border-gray-200,
+.high-contrast .border-gray-300,
+.high-contrast .border-gray-100 {
+  border-color: #fff !important;
+}
+
+.high-contrast .bg-primary-500,
+.high-contrast .bg-primary-600 {
+  background-color: #ffff00 !important;
+  color: #000 !important;
+}
+
+.high-contrast .text-primary-600,
+.high-contrast .text-primary-500,
+.high-contrast .text-primary-700 {
+  color: #ffff00 !important;
 }

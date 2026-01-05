@@ -15,18 +15,29 @@ export function TranslationResult({ result }: TranslationResultProps) {
         ? "text-yellow-600 dark:text-yellow-400"
         : "text-red-600 dark:text-red-400";
 
+  const confidenceLevel = result.confidence >= 0.8 ? "high" : result.confidence >= 0.5 ? "medium" : "low";
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div 
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
+      role="region"
+      aria-label="Translation result"
+    >
+      {/* Screen reader announcement */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        Translation result: {formatGlossName(result.predicted_gloss)} with {Math.round(result.confidence * 100)}% confidence. Confidence level: {confidenceLevel}.
+      </div>
+
       {/* Main Result */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Translation Result</p>
-          <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2" id="result-label">Translation Result</p>
+          <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2" aria-labelledby="result-label">
             {formatGlossName(result.predicted_gloss)}
           </h2>
           <div className="flex items-center justify-center space-x-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">Confidence:</span>
-            <span className={`text-lg font-semibold ${confidenceColor}`}>
+            <span className={`text-lg font-semibold ${confidenceColor}`} aria-label={`${Math.round(result.confidence * 100)}% confidence, ${confidenceLevel} level`}>
               {formatConfidence(result.confidence)}
             </span>
           </div>
