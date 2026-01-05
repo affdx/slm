@@ -134,6 +134,7 @@ data/*.csv
 # Experimental/reference folders (contain large data files)
 baseline/
 webcam-optimized/
+realtime-optimized/
 NPY/
 raw/
 reports/
