@@ -85,11 +85,11 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
   }, [onFileChange]);
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col">
       {/* Drop Zone */}
       {!selectedFile && (
         <div
-          className={`relative border-2 border-dashed rounded-xl p-8 transition-colors ${
+          className={`relative border-2 border-dashed rounded-xl p-8 transition-colors flex-1 flex items-center justify-center ${
             dragActive
               ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
               : "border-gray-300 dark:border-gray-600 hover:border-primary-400"
@@ -138,7 +138,7 @@ export function VideoUpload({ onSubmit, onFileChange, isProcessing, isModelReady
 
       {/* Preview */}
       {selectedFile && previewUrl && (
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 flex flex-col">
           <div className="relative rounded-lg overflow-hidden bg-black">
             <video
               src={previewUrl}
