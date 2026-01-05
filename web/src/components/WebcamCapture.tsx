@@ -150,13 +150,13 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
 
-      // Auto-stop after 5 seconds
+      // Auto-stop after 3 seconds
       setTimeout(() => {
         if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.stop();
           clearInterval(durationInterval);
         }
-      }, 5000);
+      }, 3000);
 
       // Store interval reference for manual stop
       mediaRecorderRef.current.ondataavailable = (e) => {
@@ -251,8 +251,8 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
         {isRecording && (
           <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full" role="status" aria-live="polite">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse" aria-hidden="true"></span>
-            <span className="text-sm font-medium">REC {recordingDuration}s / 5s</span>
-            <span className="sr-only">Recording in progress: {recordingDuration} of 5 seconds</span>
+            <span className="text-sm font-medium">REC {recordingDuration}s / 3s</span>
+            <span className="sr-only">Recording in progress: {recordingDuration} of 3 seconds</span>
           </div>
         )}
       </div>
@@ -306,7 +306,7 @@ export function WebcamCapture({ onCapture, onRecordStart, isProcessing, isModelR
       {/* Instructions */}
       <div className="text-center text-sm text-gray-500 dark:text-gray-400 space-y-1">
         <p>Position yourself in the frame with good lighting</p>
-        <p>Recording auto-translates after 5 seconds</p>
+        <p>Recording auto-translates after 3 seconds</p>
       </div>
     </div>
   );
