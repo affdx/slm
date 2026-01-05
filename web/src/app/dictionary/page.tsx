@@ -129,14 +129,16 @@ export default function DictionaryPage() {
                 placeholder="Search for a sign..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-white dark:bg-gray-800 shadow-lg shadow-gray-200/50 dark:shadow-none ring-1 ring-gray-200 dark:ring-gray-700 focus:ring-2 focus:ring-primary-500 transition-all text-lg"
+                aria-label="Search for a sign in the dictionary"
+                className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-white dark:bg-gray-800 shadow-lg shadow-gray-200/50 dark:shadow-none ring-1 ring-gray-200 dark:ring-gray-700 focus:ring-2 focus:ring-primary-500 transition-all text-lg focus-visible:outline-none"
               />
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Filter by category">
               <button
                 onClick={() => setSelectedCategory("all")}
-                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                aria-pressed={selectedCategory === "all"}
+                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                   selectedCategory === "all"
                     ? "bg-primary-600 text-white shadow-lg shadow-primary-500/25"
                     : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
@@ -150,7 +152,8 @@ export default function DictionaryPage() {
                   <button
                     key={category}
                     onClick={() => setSelectedCategory(category)}
-                    className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 capitalize ${
+                    aria-pressed={selectedCategory === category}
+                    className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                       selectedCategory === category
                         ? "bg-primary-600 text-white shadow-lg shadow-primary-500/25"
                         : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"

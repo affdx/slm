@@ -153,9 +153,11 @@ function SignPill({ sign, isLatest }: { sign: DetectedSign; isLatest: boolean })
           ? "bg-green-500 text-white scale-110 shadow-lg"
           : "bg-gray-700 text-gray-200"
       }`}
+      role="listitem"
+      aria-label={`${sign.gloss}, ${(sign.confidence * 100).toFixed(0)}% confidence${isLatest ? ", latest detection" : ""}`}
     >
       {sign.gloss}
-      <span className="ml-1 text-xs opacity-70">
+      <span className="ml-1 text-xs opacity-70" aria-hidden="true">
         {(sign.confidence * 100).toFixed(0)}%
       </span>
     </div>
@@ -167,10 +169,11 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasStartedOnce, setHasStartedOnce] = useState(false); // Track if user has started before
+  const [hasStartedOnce, setHasStartedOnce] = useState(false);
 
   const {
     isReady,
@@ -190,14 +193,12 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
     setShowSkeleton,
   } = useRealtimeInference();
 
-  // Notify parent of new detections
   useEffect(() => {
     if (currentSign && onPrediction) {
       onPrediction(currentSign);
     }
   }, [currentSign, onPrediction]);
 
-  // Stop webcam stream
   const stopStream = useCallback(() => {
     stopProcessing();
     if (streamRef.current) {
@@ -210,7 +211,6 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
     setIsStreaming(false);
   }, [stopProcessing]);
 
-  // Start webcam stream
   const startStream = useCallback(async () => {
     try {
       setError(null);
@@ -243,7 +243,6 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
     }
   }, []);
 
-  // Start real-time inference
   const handleStart = useCallback(() => {
     if (videoRef.current && canvasRef.current && isReady) {
       reset();
@@ -252,7 +251,6 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
     }
   }, [isReady, reset, startProcessing]);
 
-  // Auto-start webcam
   useEffect(() => {
     startStream();
     return () => {
@@ -261,11 +259,54 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!containerRef.current?.contains(document.activeElement) && document.activeElement !== document.body) {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case " ":
+        case "enter":
+          if (!isProcessing && isStreaming && isReady) {
+            event.preventDefault();
+            handleStart();
+          }
+          break;
+        case "escape":
+        case "s":
+          if (isProcessing) {
+            event.preventDefault();
+            stopProcessing();
+          }
+          break;
+        case "r":
+          if (isProcessing) {
+            event.preventDefault();
+            reset();
+          }
+          break;
+        case "k":
+          if (isProcessing) {
+            event.preventDefault();
+            setShowSkeleton(!showSkeleton);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isProcessing, isStreaming, isReady, handleStart, stopProcessing, reset, showSkeleton, setShowSkeleton]);
+
   const stateConfig = STATE_CONFIG[detectionState];
   const distanceWarning = prediction?.distanceStatus ? DISTANCE_CONFIG[prediction.distanceStatus] : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={containerRef} tabIndex={-1}>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {currentSign && `Detected sign: ${currentSign.gloss} with ${Math.round(currentSign.confidence * 100)}% confidence`}
+      </div>
       {/* Error Display */}
       {(error || inferenceError) && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -283,15 +324,15 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
         </div>
       )}
 
-      {/* Sign History Pills - Always visible at top once detection has started */}
       {hasStartedOnce && (
-        <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg p-3">
+        <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg p-3" role="region" aria-label="Detected signs history">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-400 font-medium">Detected Signs:</span>
             {signHistory.length > 0 && (
               <button
                 onClick={clearHistory}
-                className="text-xs text-gray-500 hover:text-white transition-colors"
+                className="text-xs text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 rounded"
+                aria-label="Clear sign history"
               >
                 Clear
               </button>
@@ -299,14 +340,13 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
           </div>
           {signHistory.length > 0 ? (
             <>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" role="list" aria-label="Recently detected signs">
                 {signHistory.slice(0, 8).map((sign, index) => (
                   <SignPill key={sign.timestamp} sign={sign} isLatest={index === 0} />
                 ))}
               </div>
-              {/* Sentence preview */}
               <div className="mt-3 pt-2 border-t border-gray-700">
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-gray-300" aria-label="Composed sentence from detected signs">
                   <span className="text-gray-500">Sentence: </span>
                   {signHistory.slice().reverse().map(s => s.gloss).join(" ")}
                 </p>
@@ -421,38 +461,38 @@ export function RealtimeWebcamCapture({ onPrediction }: RealtimeWebcamCapturePro
         {/* Hidden canvas for processing */}
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Controls inside video - Top Right */}
         {isProcessing && (
-          <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2" role="group" aria-label="Detection controls">
             <button
               onClick={() => setShowSkeleton(!showSkeleton)}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-2 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 showSkeleton
                   ? "bg-purple-600 text-white hover:bg-purple-700"
                   : "bg-black/50 text-white hover:bg-black/70"
               }`}
-              title={showSkeleton ? "Hide Skeleton" : "Show Skeleton"}
+              aria-label={showSkeleton ? "Hide skeleton overlay (K)" : "Show skeleton overlay (K)"}
+              aria-pressed={showSkeleton}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             </button>
             <button
               onClick={reset}
-              className="p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-              title="Reset"
+              className="p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+              aria-label="Reset detection (R)"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
             <button
               onClick={stopProcessing}
-              className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
-              title="Stop Detection"
+              className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+              aria-label="Stop detection (S or Escape)"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="6" y="6" width="12" height="12" rx="1" />
               </svg>
             </button>
