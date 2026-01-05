@@ -318,12 +318,12 @@ export function RealtimeWebcamCaptureV2({ onPrediction }: RealtimeWebcamCaptureV
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-purple-600 text-white text-xs font-bold rounded">V2</span>
-            <span className="text-sm text-purple-300">Python-style Sliding Window</span>
+            <span className="text-sm text-purple-700 dark:text-purple-300">Python-style Sliding Window</span>
           </div>
           {isProcessing && prediction && (
-            <div className="flex items-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
               <span>Frame: {prediction.frameCount}</span>
-              <span className="text-green-400">{prediction.predictionsPerSecond} pred/sec</span>
+              <span className="text-green-600 dark:text-green-400">{prediction.predictionsPerSecond} pred/sec</span>
               <span>Every {config.PRED_EVERY_N_FRAMES} frames</span>
             </div>
           )}
