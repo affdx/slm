@@ -5,6 +5,7 @@ import { VideoUpload } from "@/components/VideoUpload";
 import { VideoInferencePlayer } from "@/components/VideoInferencePlayer";
 import { WebcamCapture } from "@/components/WebcamCapture";
 import { RealtimeWebcamCapture } from "@/components/RealtimeWebcamCapture";
+import { RealtimeWebcamCaptureV2 } from "@/components/RealtimeWebcamCaptureV2";
 import { TranslationResult } from "@/components/TranslationResult";
 import { ModelLoader } from "@/components/ModelLoader";
 import {
@@ -12,9 +13,10 @@ import {
   PredictionResult,
 } from "@/hooks/useSignLanguageInference";
 import { DetectedSign } from "@/hooks/useRealtimeInference";
+import { DetectedSign as DetectedSignV2 } from "@/hooks/useRealtimeInferenceV2";
 import { addHistoryItem } from "@/lib/history";
 
-type InputMode = "upload" | "webcam" | "realtime";
+type InputMode = "upload" | "webcam" | "realtime" | "realtime-v2";
 type UploadSubMode = "quick" | "demo";
 
 export default function TranslatePage() {
@@ -23,6 +25,7 @@ export default function TranslatePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [realtimePrediction, setRealtimePrediction] = useState<DetectedSign | null>(null);
+  const [realtimePredictionV2, setRealtimePredictionV2] = useState<DetectedSignV2 | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const [selectedVideoBlob, setSelectedVideoBlob] = useState<Blob | null>(null);
@@ -43,6 +46,7 @@ export default function TranslatePage() {
   const clearResults = useCallback(() => {
     setResult(null);
     setRealtimePrediction(null);
+    setRealtimePredictionV2(null);
     setError(null);
     setSelectedVideoBlob(null);
     setSelectedFilename(null);
@@ -51,6 +55,10 @@ export default function TranslatePage() {
 
   const handleRealtimePrediction = useCallback((sign: DetectedSign) => {
     setRealtimePrediction(sign);
+  }, []);
+
+  const handleRealtimePredictionV2 = useCallback((sign: DetectedSignV2) => {
+    setRealtimePredictionV2(sign);
   }, []);
 
   const handleVideoSubmit = useCallback(
@@ -139,19 +147,27 @@ export default function TranslatePage() {
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 inline-flex w-full sm:w-auto">
-              {(["upload", "webcam", "realtime"] as const).map((m) => (
+              {(["upload", "webcam", "realtime", "realtime-v2"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => { setMode(m); clearResults(); }}
                   className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                     mode === m
-                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? m === "realtime-v2" 
+                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100 shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                   }`}
                 >
                   {m === "upload" && "Upload Video"}
                   {m === "webcam" && "Record"}
                   {m === "realtime" && "Live Detect"}
+                  {m === "realtime-v2" && (
+                    <span className="flex items-center gap-1.5">
+                      Live V2
+                      <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded">NEW</span>
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -221,6 +237,13 @@ export default function TranslatePage() {
                     onPrediction={handleRealtimePrediction}
                   />
                 )}
+
+                {mode === "realtime-v2" && (
+                  <RealtimeWebcamCaptureV2
+                    key="realtime-v2"
+                    onPrediction={handleRealtimePredictionV2}
+                  />
+                )}
               </div>
 
               {isProcessing && (
@@ -279,7 +302,44 @@ export default function TranslatePage() {
               </div>
             )}
 
-            {result && !isProcessing && mode !== "realtime" && (
+            {mode === "realtime-v2" && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm h-full max-h-[600px] flex flex-col">
+                <h3 className="text-sm font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wider mb-6">
+                  Live Detection V2
+                </h3>
+                
+                {realtimePredictionV2 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                    <div className="w-32 h-32 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center mb-2 animate-pulse">
+                      <svg className="w-16 h-16 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    
+                    <div>
+                      <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                        {realtimePredictionV2.gloss}
+                      </h2>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
+                        {(realtimePredictionV2.confidence * 100).toFixed(1)}% Confidence
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 space-y-4">
+                    <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center">
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <p>Waiting for sign input...</p>
+                    <p className="text-xs text-gray-500">V2: Continuous sliding window</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {result && !isProcessing && mode !== "realtime" && mode !== "realtime-v2" && (
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
                  <div className="p-6 border-b border-gray-100 dark:border-gray-700">
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -292,7 +352,7 @@ export default function TranslatePage() {
               </div>
             )}
             
-            {!result && !realtimePrediction && (
+            {!result && !realtimePrediction && !realtimePredictionV2 && (
               <div className="bg-primary-50 dark:bg-primary-900/10 rounded-2xl p-6 border border-primary-100 dark:border-primary-800/30">
                 <h3 className="text-primary-800 dark:text-primary-300 font-semibold mb-3">Tips for best results</h3>
                 <ul className="space-y-2 text-sm text-primary-700 dark:text-primary-400">
