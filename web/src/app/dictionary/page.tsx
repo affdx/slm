@@ -104,7 +104,7 @@ export default function DictionaryPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pt-32 pb-20">
       <div className="container mx-auto px-4">
-        <div className="max-w-3xl mx-auto text-center mb-16">
+        <div className="max-w-3xl mx-auto text-center mb-16 relative z-0">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Sign Language Dictionary
           </h1>
@@ -113,7 +113,7 @@ export default function DictionaryPage() {
           </p>
         </div>
 
-        <div className="sticky top-24 z-30 bg-gray-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 mb-8 -mx-4 px-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="sticky top-16 z-40 bg-gray-50 dark:bg-slate-950 py-4 mb-8 -mx-4 px-4 border-b border-gray-200 dark:border-gray-800 shadow-sm dark:shadow-none">
           <div className="max-w-6xl mx-auto space-y-6">
             <div className="relative max-w-2xl mx-auto">
               <svg
@@ -167,7 +167,7 @@ export default function DictionaryPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto relative z-0">
           {filteredGlosses.length === 0 ? (
             <div className="text-center py-20">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
