@@ -1,6 +1,6 @@
-# MSL Translator
+# Isyarat
 
-AI-powered Malaysian Sign Language (Bahasa Isyarat Malaysia) translation system that converts sign language gestures into text.
+> **isyarat.tech** — AI-powered Malaysian Sign Language (Bahasa Isyarat Malaysia) translation system that converts sign language gestures into text.
 
 ## Features
 
@@ -35,7 +35,7 @@ The system uses **client-side inference** for privacy and low latency:
 
 ## Demo
 
-Visit the [live demo](https://msl-translator.vercel.app) or run locally.
+Visit the [live demo](https://isyarat.tech) or run locally.
 
 ## Quick Start
 

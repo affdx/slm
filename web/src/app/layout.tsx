@@ -9,10 +9,10 @@ import { ToastProvider } from "@/components/Toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "MSL Translator - Malaysian Sign Language Translation",
+  title: "Isyarat - Malaysian Sign Language Translation",
   description:
-    "AI-powered Malaysian Sign Language translation system. Translate sign language gestures to text in real-time.",
-  keywords: ["Malaysian Sign Language", "MSL", "Sign Language Translation", "AI", "Accessibility"],
+    "AI-powered Malaysian Sign Language (Bahasa Isyarat Malaysia) translation. Translate sign language gestures to text in real-time.",
+  keywords: ["Isyarat", "Bahasa Isyarat Malaysia", "Malaysian Sign Language", "BIM", "Sign Language Translation", "AI", "Accessibility"],
 };
 
 export default function RootLayout({

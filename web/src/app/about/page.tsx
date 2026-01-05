@@ -7,7 +7,7 @@ export default function AboutPage() {
             How It Works
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
-            A technical deep-dive into the MSL Translator architecture, inference pipeline, 
+            A technical deep-dive into the Isyarat architecture, inference pipeline, 
             design decisions, and how to extend the system with your own models.
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function AboutPage() {
                   </svg>
                 }
                 title="Prediction"
-                subtitle="90 MSL Glosses"
+                subtitle="90 BIM Glosses"
                 color="emerald"
               />
             </div>

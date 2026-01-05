@@ -1,5 +1,6 @@
 export { Header } from "./Header";
 export { Footer } from "./Footer";
+export { Logo, LogoIcon } from "./Logo";
 export { VideoUpload } from "./VideoUpload";
 export { VideoInferencePlayer } from "./VideoInferencePlayer";
 export { WebcamCapture } from "./WebcamCapture";

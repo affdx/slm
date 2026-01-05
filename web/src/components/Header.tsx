@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "./ThemeProvider";
+import { Logo } from "./Logo";
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -189,15 +190,10 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           <Link 
             href="/" 
-            className="flex items-center space-x-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-lg"
-            aria-label="MSL Translator - Go to homepage"
+            className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-lg"
+            aria-label="Isyarat - Go to homepage"
           >
-            <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:bg-primary-600 transition-colors" aria-hidden="true">
-              M
-            </div>
-            <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-              MSL<span className="text-primary-500">.</span>Translator
-            </span>
+            <Logo size="sm" className="text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
           </Link>
 
           <div className="hidden md:flex items-center space-x-1" role="menubar">
