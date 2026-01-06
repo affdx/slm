@@ -147,27 +147,19 @@ export default function TranslatePage() {
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 inline-flex w-full sm:w-auto">
-              {(["upload", "webcam", "realtime", "realtime-v2"] as const).map((m) => (
+              {(["upload", "webcam", "realtime"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => { setMode(m); clearResults(); }}
                   className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                     mode === m
-                      ? m === "realtime-v2" 
-                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100 shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                   }`}
                 >
                   {m === "upload" && "Upload Video"}
                   {m === "webcam" && "Record"}
                   {m === "realtime" && "Live Detect"}
-                  {m === "realtime-v2" && (
-                    <span className="flex items-center gap-1.5">
-                      Live V2
-                      <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded">NEW</span>
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
